@@ -1,0 +1,177 @@
+﻿cargo : [1m[92m    Finished[0m ]8;;https://doc.rust-lang.org/cargo/reference/profiles.html#default-profiles\`relea
+se` profile [optimized]]8;;\ target(s) in 1.68s
+At line:15 char:1940
++ ... p\node_modules\@vscode\ripgrep\bin'; cargo run --release 2>&1 | Tee-O ...
++                                          ~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([1m[92m    Fi...get(s) in 1.68s:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[1m[92m     Running[0m `target\release\daedalus.exe`
+[2m2026-10-06T19:45:51.177159Z[0m [32m INFO[0m [2mbevy_render::renderer[0m[2m:[0m AdapterInfo { name: "NVIDIA G
+eForce RTX 3060 Laptop GPU", vendor: 4318, device: 9568, device_type: DiscreteGpu, device_pci_bus_id: "0000:01:00.0", d
+river: "NVIDIA", driver_info: "610.47", backend: Vulkan, subgroup_min_size: 32, subgroup_max_size: 32, transient_saves_
+memory: false }
+[2m2026-10-06T19:45:51.486965Z[0m [32m INFO[0m [2mdaedalus::config[0m[2m:[0m Config hot-reload enabled for conf
+ig.toml
+[2m2026-10-06T19:45:51.487406Z[0m [32m INFO[0m [2mdaedalus[0m[2m:[0m ROS2 integration disabled
+[2m2026-10-06T19:45:51.487732Z[0m [32m INFO[0m [2mdaedalus::talos::ipc[0m[2m:[0m talos ipc: net mode -> 192.168
+.2.200 (udp 9571, tcp 9572)
+[2m2026-10-06T19:45:51.495412Z[0m [32m INFO[0m [2mdaedalus::talos::plugin[0m[2m:[0m talos subscriber ready
+[2m2026-10-06T19:45:51.495531Z[0m [32m INFO[0m [2mdaedalus[0m[2m:[0m talos integration enabled
+[2m2026-10-06T19:45:51.511388Z[0m [32m INFO[0m [2mbevy_pbr::cluster[0m[2m:[0m GPU clustering is supported on th
+is device.
+[2m2026-10-06T19:45:51.511438Z[0m [32m INFO[0m [2mbevy_render::batching::gpu_preprocessing[0m[2m:[0m GPU prepro
+cessing is fully supported on this device.
+[2m2026-10-06T19:45:51.512231Z[0m [32m INFO[0m [2mbevy_winit::system[0m[2m:[0m Creating new window daedalus (65
+v0)
+[2m2026-10-06T19:45:52.361347Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Red_Sm
+all_Outpost@'A_ARMOR_ROOT': Added marker with 4 points
+[2m2026-10-06T19:45:52.361384Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Red_Sm
+all_Outpost@'A_ARMOR_ROOT': Extracted 26 vertices
+[2m2026-10-06T19:45:52.361395Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Red_Sm
+all_Outpost@'A_ARMOR_ROOT': Extracted 26 vertices
+[2m2026-10-06T19:45:52.361437Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Red_Sm
+all_Outpost@'B_ARMOR_ROOT': Added marker with 4 points
+[2m2026-10-06T19:45:52.361449Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Red_Sm
+all_Outpost@'B_ARMOR_ROOT': Extracted 35 vertices
+[2m2026-10-06T19:45:52.361455Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Red_Sm
+all_Outpost@'B_ARMOR_ROOT': Extracted 34 vertices
+[2m2026-10-06T19:45:52.361484Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Red_Sm
+all_Outpost@'C_ARMOR_ROOT': Added marker with 4 points
+[2m2026-10-06T19:45:52.361494Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Red_Sm
+all_Outpost@'C_ARMOR_ROOT': Extracted 27 vertices
+[2m2026-10-06T19:45:52.361500Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Red_Sm
+all_Outpost@'C_ARMOR_ROOT': Extracted 44 vertices
+[2m2026-10-06T19:45:52.361541Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Blue_S
+mall_Outpost@'D_ARMOR_ROOT': Added marker with 4 points
+[2m2026-10-06T19:45:52.361550Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Blue_S
+mall_Outpost@'D_ARMOR_ROOT': Extracted 35 vertices
+[2m2026-10-06T19:45:52.361556Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Blue_S
+mall_Outpost@'D_ARMOR_ROOT': Extracted 34 vertices
+[2m2026-10-06T19:45:52.361581Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Blue_S
+mall_Outpost@'E_ARMOR_ROOT': Added marker with 4 points
+[2m2026-10-06T19:45:52.361590Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Blue_S
+mall_Outpost@'E_ARMOR_ROOT': Extracted 35 vertices
+[2m2026-10-06T19:45:52.361596Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Blue_S
+mall_Outpost@'E_ARMOR_ROOT': Extracted 34 vertices
+[2m2026-10-06T19:45:52.361620Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Blue_S
+mall_Outpost@'F_ARMOR_ROOT': Added marker with 4 points
+[2m2026-10-06T19:45:52.361630Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Blue_S
+mall_Outpost@'F_ARMOR_ROOT': Extracted 35 vertices
+[2m2026-10-06T19:45:52.361636Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Blue_S
+mall_Outpost@'F_ARMOR_ROOT': Extracted 34 vertices
+[2m2026-10-06T19:45:52.377173Z[0m [32m INFO[0m [2mdaedalus::robomaster::tech_core::construct[0m[2m:[0m Tech cor
+e lights bound
+[2m2026-10-06T19:45:52.416082Z[0m [33m WARN[0m [2mbevy_gltf::loader[0m[2m:[0m Unknown vertex attribute COLOR_1
+[2m2026-10-06T19:45:52.416126Z[0m [33m WARN[0m [2mbevy_gltf::loader[0m[2m:[0m Unknown vertex attribute COLOR_1
+[2m2026-10-06T19:45:52.416144Z[0m [33m WARN[0m [2mbevy_gltf::loader[0m[2m:[0m Unknown vertex attribute COLOR_1
+[2m2026-10-06T19:45:52.417592Z[0m [33m WARN[0m [2mbevy_gltf::loader[0m[2m:[0m Unknown vertex attribute COLOR_1
+[2m2026-10-06T19:45:52.417650Z[0m [33m WARN[0m [2mbevy_gltf::loader[0m[2m:[0m Unknown vertex attribute COLOR_1
+[2m2026-10-06T19:45:52.417682Z[0m [33m WARN[0m [2mbevy_gltf::loader[0m[2m:[0m Unknown vertex attribute COLOR_1
+[2m2026-10-06T19:45:52.419305Z[0m [33m WARN[0m [2mbevy_gltf::loader[0m[2m:[0m Unknown vertex attribute COLOR_1
+[2m2026-10-06T19:45:52.419350Z[0m [33m WARN[0m [2mbevy_gltf::loader[0m[2m:[0m Unknown vertex attribute COLOR_1
+[2m2026-10-06T19:45:52.419378Z[0m [33m WARN[0m [2mbevy_gltf::loader[0m[2m:[0m Unknown vertex attribute COLOR_1
+[2m2026-10-06T19:45:52.420896Z[0m [33m WARN[0m [2mbevy_gltf::loader[0m[2m:[0m Unknown vertex attribute COLOR_1
+[2m2026-10-06T19:45:52.420950Z[0m [33m WARN[0m [2mbevy_gltf::loader[0m[2m:[0m Unknown vertex attribute COLOR_1
+[2m2026-10-06T19:45:52.420986Z[0m [33m WARN[0m [2mbevy_gltf::loader[0m[2m:[0m Unknown vertex attribute COLOR_1
+[2m2026-10-06T19:45:52.422775Z[0m [33m WARN[0m [2mbevy_gltf::loader[0m[2m:[0m Unknown vertex attribute COLOR_1
+[2m2026-10-06T19:45:52.422817Z[0m [33m WARN[0m [2mbevy_gltf::loader[0m[2m:[0m Unknown vertex attribute COLOR_1
+[2m2026-10-06T19:45:52.422838Z[0m [33m WARN[0m [2mbevy_gltf::loader[0m[2m:[0m Unknown vertex attribute COLOR_1
+[2m2026-10-06T19:45:52.428675Z[0m [33m WARN[0m [2mbevy_gltf::loader[0m[2m:[0m Unknown vertex attribute COLOR_1
+[2m2026-10-06T19:45:52.428710Z[0m [33m WARN[0m [2mbevy_gltf::loader[0m[2m:[0m Unknown vertex attribute COLOR_1
+[2m2026-10-06T19:45:52.428724Z[0m [33m WARN[0m [2mbevy_gltf::loader[0m[2m:[0m Unknown vertex attribute COLOR_1
+[2m2026-10-06T19:45:52.429683Z[0m [33m WARN[0m [2mbevy_gltf::loader[0m[2m:[0m Unknown vertex attribute COLOR_1
+[2m2026-10-06T19:45:52.429710Z[0m [33m WARN[0m [2mbevy_gltf::loader[0m[2m:[0m Unknown vertex attribute COLOR_1
+[2m2026-10-06T19:45:52.429723Z[0m [33m WARN[0m [2mbevy_gltf::loader[0m[2m:[0m Unknown vertex attribute COLOR_1
+[2m2026-10-06T19:45:52.430912Z[0m [33m WARN[0m [2mbevy_gltf::loader[0m[2m:[0m Unknown vertex attribute COLOR_1
+[2m2026-10-06T19:45:52.430951Z[0m [33m WARN[0m [2mbevy_gltf::loader[0m[2m:[0m Unknown vertex attribute COLOR_1
+[2m2026-10-06T19:45:52.430973Z[0m [33m WARN[0m [2mbevy_gltf::loader[0m[2m:[0m Unknown vertex attribute COLOR_1
+[2m2026-10-06T19:45:52.431928Z[0m [33m WARN[0m [2mbevy_gltf::loader[0m[2m:[0m Unknown vertex attribute COLOR_1
+[2m2026-10-06T19:45:52.431973Z[0m [33m WARN[0m [2mbevy_gltf::loader[0m[2m:[0m Unknown vertex attribute COLOR_1
+[2m2026-10-06T19:45:52.432007Z[0m [33m WARN[0m [2mbevy_gltf::loader[0m[2m:[0m Unknown vertex attribute COLOR_1
+[2m2026-10-06T19:45:52.432998Z[0m [33m WARN[0m [2mbevy_gltf::loader[0m[2m:[0m Unknown vertex attribute COLOR_1
+[2m2026-10-06T19:45:52.433027Z[0m [33m WARN[0m [2mbevy_gltf::loader[0m[2m:[0m Unknown vertex attribute COLOR_1
+[2m2026-10-06T19:45:52.433050Z[0m [33m WARN[0m [2mbevy_gltf::loader[0m[2m:[0m Unknown vertex attribute COLOR_1
+[2m2026-10-06T19:45:52.960488Z[0m [32m INFO[0m [2mbevy_diagnostic[0m[2m:[0m fps               :    2.241414   (
+avg 77.949937)
+[2m2026-10-06T19:45:52.960525Z[0m [32m INFO[0m [2mbevy_diagnostic[0m[2m:[0m frame_time        :  446.147000ms (
+avg 45.490204ms)
+[2m2026-10-06T19:45:52.960538Z[0m [32m INFO[0m [2mbevy_diagnostic[0m[2m:[0m started_load_count:  124.164589   (
+avg 120.440000)
+[2m2026-10-06T19:45:52.960545Z[0m [32m INFO[0m [2mbevy_diagnostic[0m[2m:[0m frame_count       : 24.000000
+[2m2026-10-06T19:45:53.027437Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Red_Sm
+all_Three@'1_ARMOR_ROOT': Added marker with 4 points
+[2m2026-10-06T19:45:53.027467Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Red_Sm
+all_Three@'1_ARMOR_ROOT': Extracted 32 vertices
+[2m2026-10-06T19:45:53.027495Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Red_Sm
+all_Three@'1_ARMOR_ROOT': Extracted 34 vertices
+[2m2026-10-06T19:45:53.027641Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Red_Sm
+all_Three@'2_ARMOR_ROOT': Added marker with 4 points
+[2m2026-10-06T19:45:53.027665Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Red_Sm
+all_Three@'2_ARMOR_ROOT': Extracted 32 vertices
+[2m2026-10-06T19:45:53.027672Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Red_Sm
+all_Three@'2_ARMOR_ROOT': Extracted 34 vertices
+[2m2026-10-06T19:45:53.027747Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Red_Sm
+all_Three@'3_ARMOR_ROOT': Added marker with 4 points
+[2m2026-10-06T19:45:53.027784Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Red_Sm
+all_Three@'3_ARMOR_ROOT': Extracted 32 vertices
+[2m2026-10-06T19:45:53.027794Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Red_Sm
+all_Three@'3_ARMOR_ROOT': Extracted 34 vertices
+[2m2026-10-06T19:45:53.027908Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Red_Sm
+all_Three@'_ARMOR_ROOT': Added marker with 4 points
+[2m2026-10-06T19:45:53.027925Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Red_Sm
+all_Three@'_ARMOR_ROOT': Extracted 32 vertices
+[2m2026-10-06T19:45:53.027931Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Red_Sm
+all_Three@'_ARMOR_ROOT': Extracted 34 vertices
+[2m2026-10-06T19:45:53.082012Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Blue_S
+mall_Three@'1_ARMOR_ROOT': Added marker with 4 points
+[2m2026-10-06T19:45:53.082043Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Blue_S
+mall_Three@'1_ARMOR_ROOT': Extracted 32 vertices
+[2m2026-10-06T19:45:53.082052Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Blue_S
+mall_Three@'1_ARMOR_ROOT': Extracted 34 vertices
+[2m2026-10-06T19:45:53.082128Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Blue_S
+mall_Three@'2_ARMOR_ROOT': Added marker with 4 points
+[2m2026-10-06T19:45:53.082141Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Blue_S
+mall_Three@'2_ARMOR_ROOT': Extracted 32 vertices
+[2m2026-10-06T19:45:53.082149Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Blue_S
+mall_Three@'2_ARMOR_ROOT': Extracted 34 vertices
+[2m2026-10-06T19:45:53.082226Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Blue_S
+mall_Three@'3_ARMOR_ROOT': Added marker with 4 points
+[2m2026-10-06T19:45:53.082238Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Blue_S
+mall_Three@'3_ARMOR_ROOT': Extracted 32 vertices
+[2m2026-10-06T19:45:53.082245Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Blue_S
+mall_Three@'3_ARMOR_ROOT': Extracted 34 vertices
+[2m2026-10-06T19:45:53.082320Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Blue_S
+mall_Three@'_ARMOR_ROOT': Added marker with 4 points
+[2m2026-10-06T19:45:53.082332Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Blue_S
+mall_Three@'_ARMOR_ROOT': Extracted 32 vertices
+[2m2026-10-06T19:45:53.082340Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Blue_S
+mall_Three@'_ARMOR_ROOT': Extracted 34 vertices
+[2m2026-10-06T19:45:53.123687Z[0m [32m INFO[0m [2mdaedalus::scene[0m[2m:[0m scene loaded
+[2m2026-10-06T19:45:53.127297Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Blue_L
+arge_One@'1_AM12_ARMOR_ROOT': Added marker with 4 points
+[2m2026-10-06T19:45:53.127333Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Blue_L
+arge_One@'1_AM12_ARMOR_ROOT': Extracted 32 vertices
+[2m2026-10-06T19:45:53.127346Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Blue_L
+arge_One@'1_AM12_ARMOR_ROOT': Extracted 34 vertices
+[2m2026-10-06T19:45:53.127460Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Blue_L
+arge_One@'2_AM12_ARMOR_ROOT': Added marker with 4 points
+[2m2026-10-06T19:45:53.127475Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Blue_L
+arge_One@'2_AM12_ARMOR_ROOT': Extracted 32 vertices
+[2m2026-10-06T19:45:53.127485Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Blue_L
+arge_One@'2_AM12_ARMOR_ROOT': Extracted 34 vertices
+[2m2026-10-06T19:45:53.127601Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Blue_L
+arge_One@'3_AM12_ARMOR_ROOT': Added marker with 4 points
+[2m2026-10-06T19:45:53.127616Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Blue_L
+arge_One@'3_AM12_ARMOR_ROOT': Extracted 32 vertices
+[2m2026-10-06T19:45:53.127625Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Blue_L
+arge_One@'3_AM12_ARMOR_ROOT': Extracted 34 vertices
+[2m2026-10-06T19:45:53.127703Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Blue_L
+arge_One@'4_AM12_ARMOR_ROOT': Added marker with 4 points
+[2m2026-10-06T19:45:53.127715Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Blue_L
+arge_One@'4_AM12_ARMOR_ROOT': Extracted 32 vertices
+[2m2026-10-06T19:45:53.127724Z[0m [32m INFO[0m [2mdaedalus::robomaster::armor::construct[0m[2m:[0m Armor Blue_L
+arge_One@'4_AM12_ARMOR_ROOT': Extracted 34 vertices
+talos-net: image connect failed: connection timed out, retrying
+[2m2026-10-06T19:45:53.926393Z[0m [32m INFO[0m [2mbevy_window::system[0m[2m:[0m No windows are open, exiting
+[2m2026-10-06T19:45:53.926441Z[0m [32m INFO[0m [2mbevy_winit::system[0m[2m:[0m Closing window 65v0

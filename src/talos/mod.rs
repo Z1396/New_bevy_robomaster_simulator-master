@@ -5,6 +5,7 @@
 
 mod capture;
 mod ground_truth;
+mod ipc;
 mod plugin;
 
 pub use plugin::TalosPlugin;

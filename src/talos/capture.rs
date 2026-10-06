@@ -8,6 +8,7 @@ use crate::capture::{
 };
 use crate::components::{Controlled, InfantryGimbal, InfantryLaunchOffset, SubscribeAutoAim};
 use crate::systems::{ChassisObservationFrame, GameplaySystems};
+use crate::talos::ipc::TalosIpcPublisher;
 use crate::talos::plugin::{to_ros_quat, to_ros_translation};
 use bevy::ecs::world::DeferredWorld;
 use bevy::prelude::*;
@@ -81,7 +82,7 @@ impl SnapshotSync for TalosSnapshotSync {
 }
 
 struct TalosSnapshot {
-    ctx: Arc<Mutex<ShmPublisher>>,
+    ctx: Arc<Mutex<TalosIpcPublisher>>,
     frame_seq: u64,
     timestamp_ns: u64,
     pose: CapturedPoseData,
@@ -149,11 +150,11 @@ impl GpuCaptureHandler for TalosSnapshotCreator {
 }
 
 #[derive(Resource, Clone, Deref, DerefMut)]
-pub struct TalosCaptureContextShared(pub Arc<Mutex<ShmPublisher>>);
+pub struct TalosCaptureContextShared(pub Arc<Mutex<TalosIpcPublisher>>);
 
 #[derive(Resource, Clone)]
 pub struct TalosCaptureContext {
-    pub publisher: Arc<Mutex<ShmPublisher>>,
+    pub publisher: Arc<Mutex<TalosIpcPublisher>>,
     pub fov_y: f32,
 }
 
@@ -330,7 +331,7 @@ fn captured_pose_data(
 }
 
 fn publish_pose_data(
-    publisher: &mut ShmPublisher,
+    publisher: &mut TalosIpcPublisher,
     frame_seq: u64,
     timestamp_ns: u64,
     pose: &CapturedPoseData,

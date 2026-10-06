@@ -36,6 +36,8 @@ impl From<io::Error> for ShmError {
 fn shm_path(name: &str) -> PathBuf {
     let clean_name = name.trim_start_matches('/');
     #[cfg(target_os = "windows")]
+    // Windows 使用临时目录(TempDir)
+    // 注意：Windows 上的共享内存文件名不能以 '/' 开头
     return std::env::temp_dir().join(clean_name);
     #[cfg(not(target_os = "windows"))]
     // Unix 使用 /tmp 目录

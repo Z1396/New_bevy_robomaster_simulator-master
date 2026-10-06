@@ -9,6 +9,9 @@ mod shm;
 mod subscriber;
 mod triple_buffer;
 
+#[cfg(feature = "net")]
+pub mod net_ipc;
+
 pub use layout::*;
 pub use publisher::ShmPublisher;
 pub use shm::{ShmError, ShmRegion};

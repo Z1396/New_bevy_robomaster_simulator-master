@@ -5,6 +5,9 @@ edition = "2024"
 
 [dependencies]
 memmap2 = { version = "0", optional = true }
+image = { version = "0", default-features = false, features = ["jpeg"], optional = true }
 
 [features]
-default = ["memmap2"]
+default = ["memmap2", "net"]
+# net: 网络转发（UDP 元数据 + TCP JPEG 图像流），对接 talos_ipc_bridge
+net = ["dep:image"]

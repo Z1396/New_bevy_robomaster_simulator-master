@@ -4,6 +4,7 @@ use crate::components::{
     Controlled, InfantryChassis, InfantryGimbal, InfantryLaunchOffset, SubscribeAutoAim,
 };
 use crate::config::SimulationConfig;
+use crate::talos::ipc::{TalosIpc, TalosIpcSubscriber};
 use crate::systems::{GimbalAimTarget, GimbalAimTracker, projectile_launch};
 use crate::talos::capture::{
     TalosCaptureContext, TalosCapturePlugin, TalosFrameStamp, advance_talos_frame_stamp,
@@ -17,7 +18,7 @@ use std::sync::{Arc, Mutex};
 use talos_ipc::*;
 
 #[derive(Resource)]
-pub struct ShmSubscriberRes(pub Arc<Mutex<ShmSubscriber>>);
+pub struct TalosSubscriberRes(pub Arc<Mutex<TalosIpcSubscriber>>);
 
 #[derive(Resource, Deref, DerefMut)]
 pub struct TalosEnabled(pub AtomicBool);
@@ -48,18 +49,15 @@ pub struct TalosPlugin {
 
 impl Plugin for TalosPlugin {
     fn build(&self, app: &mut App) {
-        let publisher = match ShmPublisher::create() {
-            Ok(p) => {
-                info!("talos shm created");
-                p
-            }
+        let ipc = match TalosIpc::new() {
+            Ok(ipc) => ipc,
             Err(e) => {
-                error!("cannot create talos shm: {}", e);
+                error!("cannot create talos ipc: {}", e);
                 return;
             }
         };
 
-        let publisher = Arc::new(Mutex::new(publisher));
+        let publisher = Arc::new(Mutex::new(ipc.publisher));
 
         let capture_config = CaptureConfig {
             width: self.config.width,
@@ -80,14 +78,11 @@ impl Plugin for TalosPlugin {
             context: capture_context,
         });
 
-        match ShmSubscriber::connect() {
-            Ok(subscriber) => {
-                info!("connected to talos-cpp");
-                app.insert_resource(ShmSubscriberRes(Arc::new(Mutex::new(subscriber))));
-            }
-            Err(_) => {
-                info!("could not connect to talos-cpp");
-            }
+        if let Some(subscriber) = ipc.subscriber {
+            info!("talos subscriber ready");
+            app.insert_resource(TalosSubscriberRes(Arc::new(Mutex::new(subscriber))));
+        } else {
+            info!("talos subscriber not available");
         }
 
         app.insert_resource(TalosEnabled(AtomicBool::new(true)));
@@ -110,7 +105,7 @@ impl Plugin for TalosPlugin {
 }
 
 fn process_subscription(
-    context: Option<Res<ShmSubscriberRes>>,
+    context: Option<Res<TalosSubscriberRes>>,
     mut commands: Commands,
     gimbal: Single<
         (Entity, Option<&mut GimbalAimTracker>),
@@ -173,7 +168,7 @@ pub fn publish_pose(
     }
 }
 
-pub fn recv_gimbal_cmd(subscriber: &ShmSubscriberRes) -> Option<GimbalCmd> {
+pub fn recv_gimbal_cmd(subscriber: &TalosSubscriberRes) -> Option<GimbalCmd> {
     subscriber.0.lock().ok()?.recv_gimbal_cmd()
 }
 
