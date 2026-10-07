@@ -10,7 +10,7 @@
 use crate::layout::*;
 use std::io::Write;
 use std::net::{IpAddr, SocketAddr, TcpStream, UdpSocket};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -165,6 +165,7 @@ pub struct NetIpcPublisher {
     camera_info: Mutex<Option<(CameraInfo, Instant)>>,
     runtime_state: Mutex<Option<RuntimeState>>,
     image_slot: Arc<ImageSlot>,
+    tcp_connected: Arc<AtomicBool>,
     gimbal_slot: Arc<Mutex<Option<GimbalCmd>>>,
     threads: Mutex<Vec<JoinHandle<()>>>,
 }
@@ -183,6 +184,7 @@ impl NetIpcPublisher {
             camera_info: Mutex::new(None),
             runtime_state: Mutex::new(None),
             image_slot: Arc::new(ImageSlot::new()),
+            tcp_connected: Arc::new(AtomicBool::new(false)),
             gimbal_slot: Arc::new(Mutex::new(None)),
             threads: Mutex::new(Vec::new()),
         };
@@ -206,9 +208,10 @@ impl NetIpcPublisher {
     fn spawn_tcp_thread(&self) {
         let remote_ip = self.remote.ip();
         let image_slot = self.image_slot.clone();
+        let tcp_connected = self.tcp_connected.clone();
         let handle = thread::Builder::new()
             .name("talos-net-image".into())
-            .spawn(move || tcp_image_loop(remote_ip, image_slot))
+            .spawn(move || tcp_image_loop(remote_ip, image_slot, tcp_connected))
             .expect("spawn talos-net image thread");
         self.threads.lock().unwrap().push(handle);
     }
@@ -315,7 +318,11 @@ impl NetIpcPublisher {
     }
 
     /// 渲染线程调用：把最新一帧原始 RGB 推给 TCP 线程（只保留最新，允许跳帧）。
+    /// TCP 未连接时直接跳过：省掉每帧 1440x1080x3 ≈ 4.6MB 的无谓拷贝。
     pub fn publish_image_raw(&self, data: &[u8], seq: u64, timestamp_ns: u64) {
+        if !self.tcp_connected.load(Ordering::Relaxed) {
+            return;
+        }
         self.image_slot
             .publish(data, IMAGE_WIDTH, IMAGE_HEIGHT, seq, timestamp_ns);
     }
@@ -377,17 +384,19 @@ fn valid_packet_header(header: &[u8], expect_type: u8, expect_payload_len: u16) 
         && payload_len == expect_payload_len
 }
 
-fn tcp_image_loop(remote_ip: IpAddr, image_slot: Arc<ImageSlot>) {
+fn tcp_image_loop(remote_ip: IpAddr, image_slot: Arc<ImageSlot>, connected: Arc<AtomicBool>) {
     let addr = SocketAddr::new(remote_ip, NET_TCP_PORT);
     loop {
         match TcpStream::connect_timeout(&addr, Duration::from_secs(2)) {
             Ok(mut stream) => {
                 let _ = stream.set_nodelay(true);
                 let _ = stream.set_write_timeout(Some(Duration::from_secs(2)));
+                connected.store(true, Ordering::Relaxed);
                 eprintln!("talos-net: image stream connected to {}", addr);
                 if let Err(e) = image_stream_loop(&mut stream, &image_slot) {
                     eprintln!("talos-net: image stream error: {}, reconnecting", e);
                 }
+                connected.store(false, Ordering::Relaxed);
             }
             Err(e) => {
                 eprintln!("talos-net: image connect failed: {}, retrying", e);
@@ -399,8 +408,10 @@ fn tcp_image_loop(remote_ip: IpAddr, image_slot: Arc<ImageSlot>) {
 
 fn image_stream_loop(stream: &mut TcpStream, image_slot: &ImageSlot) -> std::io::Result<()> {
     loop {
+        // 按值取走帧：缓冲所有权移交编码器，全链路零多余拷贝
         let raw = image_slot.take();
-        let jpeg = encode_jpeg(&raw)?;
+        let (seq, timestamp_ns) = (raw.seq, raw.timestamp_ns);
+        let jpeg = encode_jpeg(raw)?;
 
         let header = ImageFrameHeader {
             magic: NET_MAGIC,
@@ -410,8 +421,8 @@ fn image_stream_loop(stream: &mut TcpStream, image_slot: &ImageSlot) -> std::io:
             height: IMAGE_HEIGHT,
             jpeg_len: jpeg.len() as u32,
             _pad2: 0,
-            seq: raw.seq,
-            timestamp_ns: raw.timestamp_ns,
+            seq,
+            timestamp_ns,
         };
 
         stream.write_all(bytes_of(&header))?;
@@ -421,7 +432,8 @@ fn image_stream_loop(stream: &mut TcpStream, image_slot: &ImageSlot) -> std::io:
 }
 
 /// JPEG 编码；分辨率必须严格 1440×1080，渲染分辨率不同时先 resize。
-fn encode_jpeg(raw: &RawImageFrame) -> std::io::Result<Vec<u8>> {
+/// 按值接收帧：缓冲所有权移交（不 clone），编码后即释放。
+fn encode_jpeg(mut raw: RawImageFrame) -> std::io::Result<Vec<u8>> {
     use image::codecs::jpeg::JpegEncoder;
     use image::imageops::FilterType;
     use image::{ExtendedColorType, ImageBuffer, ImageEncoder, RgbImage};
@@ -429,12 +441,11 @@ fn encode_jpeg(raw: &RawImageFrame) -> std::io::Result<Vec<u8>> {
     // 通道序开关：捕获缓冲按 BGR 解释（与对端 imdecode→共享内存→talos 链路约定
     // 一致），先交换 R/B 再按 RGB 编码。若对端颜色反而更歪（说明缓冲本就是
     // RGB 序），删掉下面的 swap 循环即可。
-    let mut data = raw.data.clone();
-    for pixel in data.chunks_exact_mut(3) {
+    for pixel in raw.data.chunks_exact_mut(3) {
         pixel.swap(0, 2);
     }
 
-    let rgb = RgbImage::from_raw(raw.width, raw.height, data)
+    let rgb = RgbImage::from_raw(raw.width, raw.height, std::mem::take(&mut raw.data))
         .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "bad image size"))?;
 
     let frame: ImageBuffer<image::Rgb<u8>, Vec<u8>> =

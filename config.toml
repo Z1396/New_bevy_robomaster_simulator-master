@@ -18,7 +18,7 @@ enabled = true
 
 [render]
 # Expensive on large scenes; disable for higher FPS.
-shadows = true
+shadows = false
 # Main on-screen camera anti-aliasing.
 main_camera_fxaa = true
 # Enables Apple's MetalFX temporal scaler for color 3D cameras on macOS.
