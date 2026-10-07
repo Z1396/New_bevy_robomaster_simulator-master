@@ -3,7 +3,7 @@ use std::sync::atomic::Ordering;
 
 use crate::components::{
     ActiveSlapper, Controlled, Infantry, InfantryChassis, InfantryGimbal, SlapperInfantry,
-    SubscribeAutoAim,
+    Spinning, SubscribeAutoAim,
 };
 use crate::config::SimulationConfig;
 use crate::robomaster::vehicle::movement::VehicleDynamic;
@@ -224,6 +224,7 @@ pub fn switch_slapper_control(
     children: Query<&Children>,
     slapper_roots: Query<Entity, (With<Infantry>, With<SlapperInfantry>)>,
     active_root: Query<Entity, (With<Infantry>, With<SlapperInfantry>, With<ActiveSlapper>)>,
+    spinning_roots: Query<(), With<Spinning>>,
 ) {
     if !controller.controlled.switch_slapper_just_pressed {
         return;
@@ -248,9 +249,20 @@ pub fn switch_slapper_control(
             commands.entity(descendant).remove::<ActiveSlapper>();
         }
     }
+    // 切走时什么都不做：ActiveSlapper 被移除后，自转系统（spin_display_vehicle）
+    // 下帧自动恢复匹配，接管角速度与角阻尼。
 
     // Add ActiveSlapper to next
     let next_root = roots[next_idx];
+    if spinning_roots.contains(next_root) {
+        // 展示战车被选中：同批瞬间刹停（角速度清零 + 角阻尼恢复 setup_vehicle
+        // 实配值 50.0），防止残留自转导致操控时车身抖动侧翻。
+        // Spinning 组件全程不摘不挂，切换状态完全由 ActiveSlapper 的有无决定。
+        commands.entity(next_root).insert((
+            AngularVelocity(Vec3::ZERO),
+            AngularDamping(50.0),
+        ));
+    }
     commands.entity(next_root).insert(ActiveSlapper);
     for descendant in children.iter_descendants(next_root) {
         commands.entity(descendant).insert(ActiveSlapper);

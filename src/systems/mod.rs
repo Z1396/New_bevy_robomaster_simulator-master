@@ -5,6 +5,7 @@ mod debug;
 mod gimbal_pid;
 mod input;
 mod projectile;
+mod spin;
 mod uav;
 pub use camera::*;
 pub use chassis_observation::*;
@@ -13,6 +14,7 @@ pub use debug::*;
 pub use gimbal_pid::*;
 pub use input::*;
 pub use projectile::*;
+pub use spin::*;
 pub use uav::*;
 
 use bevy::prelude::*;

@@ -125,8 +125,13 @@ impl ImageSlot {
 
     fn publish(&self, data: &[u8], width: u32, height: u32, seq: u64, timestamp_ns: u64) {
         let mut guard = self.frame.lock().unwrap();
+        // 复用被替换帧的缓冲容量：每帧 1440x1080x3 ≈ 4.6MB，若每次都新分配，
+        // 内存紧张的机器上高频分配/释放会加速堆耗尽。
+        let mut buffer = guard.take().map(|f| f.data).unwrap_or_default();
+        buffer.clear();
+        buffer.extend_from_slice(data);
         *guard = Some(RawImageFrame {
-            data: data.to_vec(),
+            data: buffer,
             width,
             height,
             seq,

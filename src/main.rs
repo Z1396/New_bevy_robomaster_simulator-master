@@ -39,8 +39,9 @@ use crate::systems::{
     controller_shoot_pressed, dart_launch, following_controls, freecam_controls, gimbal_controls,
     gimbal_pid_controls, projectile_aerodynamics, projectile_launch, remote_gimbal_controls,
     remote_vehicle_controls, sample_gamepad_controller, sample_keyboard_controller,
-    screenshot_on_f2, screenshot_saving, setup_projectile, switch_slapper_control, uav_launch,
-    update_auto_aim_subscription, update_chassis_observation, update_help_text, vehicle_controls,
+    screenshot_on_f2, screenshot_saving, setup_projectile, spin_display_vehicle,
+    switch_slapper_control, uav_launch, update_auto_aim_subscription, update_chassis_observation,
+    update_help_text, vehicle_controls,
 };
 use bevy_metalfx::MetalFxPlugin;
 
@@ -190,7 +191,8 @@ fn main() {
                     .chain()
                     .in_set(GameplaySystems::Input),
                 // GameLogic phase
-                (change_appearance, update_help_text).in_set(GameplaySystems::GameLogic),
+                (spin_display_vehicle, change_appearance, update_help_text)
+                    .in_set(GameplaySystems::GameLogic),
                 // Camera phase
                 (
                     freecam_controls.run_if(|mode: Res<CameraMode>| mode.0 == FollowingType::Free),

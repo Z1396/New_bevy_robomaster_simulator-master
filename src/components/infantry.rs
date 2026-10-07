@@ -43,3 +43,7 @@ pub struct SlapperInfantry;
 /// Marker for the currently active (controlled) SlapperInfantry
 #[derive(Component)]
 pub struct ActiveSlapper;
+
+/// 展示战车永久能力标记，从不摘除；形态切换完全由根实体上有无 ActiveSlapper 决定。
+#[derive(Component)]
+pub struct Spinning;

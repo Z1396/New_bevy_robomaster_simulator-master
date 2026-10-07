@@ -7,6 +7,7 @@ use bevy_inspector_egui::bevy_egui::{EguiGlobalSettings, PrimaryEguiContext};
 use crate::components::{
     ActiveSlapper, Controlled, DartLaunch, GameLayer, Infantry, InfantryChassis, InfantryGimbal,
     InfantryLaunchOffset, InfantryViewOffset, MainCamera, PreciousCollision, SlapperInfantry,
+    Spinning,
 };
 use crate::config::SimulationConfig;
 use crate::robomaster::prelude::{OutpostRoot, ScanArmor, Team};
@@ -130,23 +131,29 @@ pub fn setup_vehicle(
         &Infantry,
         Option<&Controlled>,
         Option<&ActiveSlapper>,
+        Option<&Spinning>,
     )>,
     sim_config: Res<SimulationConfig>,
 ) {
-    let (root, infantry, is_local, is_active) = root_query
+    let (root, infantry, is_local, is_active, is_spinning) = root_query
         .get(root)
         .expect("setup_vehicle called on an entity that is not an Infantry root");
     let team = infantry.team;
     let config = infantry.config;
     let is_local = is_local.is_some();
     let is_active = is_active.is_some();
+    let is_spinning = is_spinning.is_some();
     if is_local {
         query.children.iter_descendants(root).for_each(|e| {
             commands.entity(e).insert(Controlled);
         });
     } else {
         query.children.iter_descendants(root).for_each(|e| {
-            commands.entity(e).insert(SlapperInfantry);
+            // 展示战车（Spinning）不是 AI，只是能被 Tab 选中：子节点不挂 SlapperInfantry；
+            // 子节点的 ActiveSlapper 由 switch_slapper_control 在选中时运行时补挂。
+            if !is_spinning {
+                commands.entity(e).insert(SlapperInfantry);
+            }
             if is_active {
                 commands.entity(e).insert(ActiveSlapper);
             }

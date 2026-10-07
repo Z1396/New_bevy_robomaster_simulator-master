@@ -17,6 +17,7 @@ use std::collections::HashMap;
 
 use crate::components::{
     ActiveSlapper, Controlled, GameLayer, GroundRoot, Infantry, PreciousCollision, SlapperInfantry,
+    Spinning,
 };
 use crate::robomaster::power_rune::construct::setup_power_rune;
 use crate::robomaster::prelude::{
@@ -211,6 +212,20 @@ async fn load_scene(w: AsyncWorld) {
         )
         .await;
     w.run(setup_vehicle, hero).await;
+
+    // 展示战车：闲置自转，被 Tab 选中时停转可操控（Spinning 永不摘除）。
+    let display = w
+        .spawn(
+            scene("test.glb"),
+            (
+                Transform::from_xyz(-7.0, 2.0, -5.0),
+                Infantry::new(Team::Blue, INFANTRY_THREE_CONFIG),
+                Spinning,
+                SlapperInfantry,
+            ),
+        )
+        .await;
+    w.run(setup_vehicle, display).await;
 
     info!("scene loaded");
 }
