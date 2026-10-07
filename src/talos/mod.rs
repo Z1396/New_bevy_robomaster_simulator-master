@@ -5,6 +5,7 @@
 
 mod capture;
 mod ground_truth;
+// 【修改】新增：IPC 通道分发封装（net/shm 运行时切换），见 ipc.rs 头注释。
 mod ipc;
 mod plugin;
 

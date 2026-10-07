@@ -191,6 +191,9 @@ fn main() {
                     .chain()
                     .in_set(GameplaySystems::Input),
                 // GameLogic phase
+                // 【修改】新增 spin_display_vehicle：展示战车闲置自转（提交 b120db1）。
+                // 放在 GameLogic（晚于 Input 阶段）：Tab 选中时 Input 阶段插入的
+                // ActiveSlapper 在本阶段前生效，自转系统同帧失配实现"瞬停"。
                 (spin_display_vehicle, change_appearance, update_help_text)
                     .in_set(GameplaySystems::GameLogic),
                 // Camera phase

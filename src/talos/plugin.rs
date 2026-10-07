@@ -49,6 +49,9 @@ pub struct TalosPlugin {
 
 impl Plugin for TalosPlugin {
     fn build(&self, app: &mut App) {
+        // 【修改】原来这里直接 ShmPublisher::create() + ShmSubscriber::connect()（仅同机）。
+        // 现在改为 TalosIpc::new()：按环境变量 TALOS_IPC=net|shm（默认 net）运行时选择
+        // 网络转发或原共享内存，两种模式走同一个分发封装，下游系统代码无需感知。
         let ipc = match TalosIpc::new() {
             Ok(ipc) => ipc,
             Err(e) => {

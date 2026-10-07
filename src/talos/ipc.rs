@@ -1,5 +1,10 @@
 //! 运行时 IPC 通道选择：网络转发（默认，对接 Linux 侧 talos_ipc_bridge）或共享内存。
 //!
+//! 【修改】新增文件（提交 9a85cc8）。原先 plugin.rs 只会创建共享内存
+//! ShmPublisher/ShmSubscriber（仅限同机）；仿真迁到 Windows、视觉程序在局域网
+//! NUC 上后，需要网络通道，但同机 Linux 调试仍要旧方式，因此用环境变量在
+//! 运行时二选一，两侧代码都保留。
+//!
 //! 环境变量：
 //! - `TALOS_IPC=net|shm`（默认 `net`）：`net` 走网络转发，`shm` 走原有 memmap 共享内存
 //!   （同机 Linux 场景仍可用旧方式）。

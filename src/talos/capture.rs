@@ -149,6 +149,8 @@ impl GpuCaptureHandler for TalosSnapshotCreator {
     }
 }
 
+// 【修改】类型从 ShmPublisher 换成 TalosIpcPublisher（分发封装）：网络模式下
+// 图像/位姿走 UDP/TCP 转发，共享内存模式下行为与原版完全一致（含同步握手）。
 #[derive(Resource, Clone, Deref, DerefMut)]
 pub struct TalosCaptureContextShared(pub Arc<Mutex<TalosIpcPublisher>>);
 

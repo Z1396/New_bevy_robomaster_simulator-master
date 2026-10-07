@@ -12,3 +12,4 @@ screenshot-*.png
 /build/
 build.sh
 env.sh
+release_run.log

@@ -18,6 +18,8 @@ enabled = true
 
 [render]
 # Expensive on large scenes; disable for higher FPS.
+# 【修改】true -> false：新增展示战车后 16GB 机器上 GPU 显存 OOM（Caught rendering
+# error: Out of Memory），阴影贴图是最大开销项；需要阴影时再手动打开。
 shadows = false
 # Main on-screen camera anti-aliasing.
 main_camera_fxaa = true

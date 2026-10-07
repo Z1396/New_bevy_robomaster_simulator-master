@@ -213,7 +213,11 @@ async fn load_scene(w: AsyncWorld) {
         .await;
     w.run(setup_vehicle, hero).await;
 
-    // 展示战车：闲置自转，被 Tab 选中时停转可操控（Spinning 永不摘除）。
+    // 【修改】新增展示战车（提交 b120db1）：双形态——闲置绕 Y 轴自转（spin.rs），
+    // 被 Tab 选中时停转由玩家操控，切走后自动恢复。形态切换完全由根实体上
+    // ActiveSlapper 的有无驱动，Spinning 永不摘挂。
+    // 位置必须在 HERO 之后（robots last）：场景是线性异步加载，环境碰撞体先就绪，
+    // 车辆后生成，否则会掉出地板；也正因此用 scene() + await 而不是 SceneRoot。
     let display = w
         .spawn(
             scene("test.glb"),

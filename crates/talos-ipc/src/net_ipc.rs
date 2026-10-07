@@ -65,6 +65,9 @@ const _: () = assert!(std::mem::offset_of!(PacketHeader, seq) == 16);
 const _: () = assert!(std::mem::offset_of!(PacketHeader, timestamp_ns) == 24);
 
 /// TCP JPEG 图像流 40 字节帧头。
+/// 【修改】pkt_type 必须位于偏移 4、填充在其后（桥按偏移 4 校验 type==8）。
+/// 最初实现把 _pad 放在偏移 4、type 放在偏移 5，导致桥"连上就断"的高频
+/// 重连循环——这是第一版联网调试时定位到的关键 bug，勿改字段顺序。
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct ImageFrameHeader {
