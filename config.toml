@@ -1,110 +1,113 @@
 # Bevy RoboMaster Simulator Configuration
-
+# 【总说明】仿真器主配置文件，TOML格式，控制渲染、相机、物理、车辆、弹丸、Livox雷达等全部参数
 [window]
 # Rendering present mode. Use `auto_no_vsync` to exceed 60Hz for Talos/ROS2 capture.
 # Options: auto_vsync, auto_no_vsync, fifo, fifo_relaxed, mailbox, immediate
-present_mode = "auto_no_vsync"
+present_mode = "auto_no_vsync" # 渲染呈现模式；auto_no_vsync关闭垂直同步，突破60帧，方便Talos/ROS2采集图像
+# 可选值：auto_vsync(开启vsync锁60帧)、auto_no_vsync(关闭vsync)、fifo/fifo_relaxed/mailbox/immediate（Vulkan底层呈现模式）
 
 [debug]
 # Turn these on only when needed; they noticeably reduce FPS.
-egui = false
-inspector = false
+egui = false        # 开启Egui调试UI界面，开启会大幅掉帧，默认关闭
+inspector = false   # Bevy实体检视器，查看场景物体组件，耗性能，关闭
 # Prints FPS/frametime diagnostics to console.
-diagnostics = true
+diagnostics = true  # 控制台输出FPS、帧耗时等性能诊断信息（你日志里bevy_diagnostic就是这个输出）
 
 [preview]
 # On-screen preview camera. Disable to avoid rendering the scene twice (preview + capture).
-enabled = true
+enabled = true      # 屏幕预览相机开关；true=窗口显示画面；false=只后台渲染供采集，不显示窗口画面，减少一次渲染开销
 
 [render]
 # Expensive on large scenes; disable for higher FPS.
 # 【修改】true -> false：新增展示战车后 16GB 机器上 GPU 显存 OOM（Caught rendering
 # error: Out of Memory），阴影贴图是最大开销项；需要阴影时再手动打开。
-shadows = false
+shadows = false             # 阴影渲染开关，阴影显存开销巨大，战车场景容易爆显存，这里关闭
 # Main on-screen camera anti-aliasing.
-main_camera_fxaa = true
+main_camera_fxaa = true     # 主预览相机FXAA快速抗锯齿，画面边缘减少锯齿，开销低
 # Enables Apple's MetalFX temporal scaler for color 3D cameras on macOS.
-metalfx_temporal = true
+metalfx_temporal = true     # macOS专用MetalFX时间缩放，Windows/Linux直接忽略该配置
 # Enables MetalFX frame interpolation after temporal upscaling.
 # Needs macOS 26 or newer; ignored (with a log line) elsewhere.
-metalfx_frame_generation = false
+metalfx_frame_generation = false # macOS帧插补，非macOS平台无效
 # Output/render resolution ratio used by MetalFX temporal upscaling. Clamped to 1.0..=3.0.
-metalfx_scale = 2.0
-illuminance = 500.0
+metalfx_scale = 2.0         # MetalFX超分缩放倍率，仅macOS生效
+illuminance = 500.0         # 全局光照亮度，单位lux，控制场景整体明暗
+
 [capture.color]
 # RGB capture resolution for existing camera pipeline.
-width = 1440
-height = 1080
+width = 1440    # 仿真采集RGB图像宽度，传给Talos图像链路
+height = 1080   # 仿真采集RGB图像高度，1440×1080，就是你崩溃时4.6M图像buffer来源
 
 [capture.depth]
 # Depth capture resolution for livox-compatible point cloud output.
-width = 1280
-height = 720
-near = 0.1
-far = 80.0
+width = 1280    # 深度图宽度，用于生成Livox点云
+height = 720    # 深度图高度
+near = 0.1      # 深度相机近裁剪面，小于0.1m物体不渲染深度
+far = 80.0      # 深度相机远裁剪面，超过80m无深度信息
 
 [livox_ros]
-enabled = true
-frame_id = "camera_link"
-publish_freq = 10.0
-points_per_second = 400000
-line_num = 20
-tag_default = 0
-intensity_default = 1000.0
+enabled = true          # Livox雷达仿真开关，开启后发布点云
+frame_id = "camera_link"# ROS坐标系frame_id，点云消息头坐标系
+publish_freq = 10.0     # 点云发布频率，10Hz
+points_per_second = 400000 # 每秒输出点云点数40万
+line_num = 20           # 雷达扫描线数，模拟Livox多线雷达
+tag_default = 0         # 点云默认标签值
+intensity_default = 1000.0 # 点云默认反射强度
 
 [physics]
-fixed_hz = 120.0                # fixed physics ticks per second
-substep_count = 8               # physics substeps per fixed tick
+fixed_hz = 120.0        # 物理固定迭代频率，120Hz，独立于渲染帧率
+substep_count = 8       # 每次物理tick的子迭代步数；步数越高物理越稳定，CPU开销变大
 
 [vehicle]
-rotation_speed = 7.42            # rad/s - chassis rotation speed
-yaw_acceleration = 20.0          # rad/s^2 - constant yaw acceleration (quadratic yaw curve)
-tilt_rotation_speed = 3.0        # rad/s - chassis roll/pitch swing speed
-gimbal_rotation_speed = 3.0     # rad/s - gimbal rotation speed
-gimbal_pitch_limit = 0.785      # rad - gimbal pitch limit (~45 degrees)
-max_speed = 6.0                 # m/s - maximum vehicle speed
-linear_acceleration = 6.0       # m/s^2 - linear acceleration
-acceleration_exponent = 2.5    # exponent for non-linear acceleration curve
-
+rotation_speed = 7.42       # rad/s 底盘自转最大转速
+yaw_acceleration = 20.0     # rad/s² 底盘yaw角加速度，控制转向响应快慢
+tilt_rotation_speed = 3.0   # rad/s 底盘roll/pitch俯仰摆动速度
+gimbal_rotation_speed = 3.0# rad/s 云台最大旋转速度
+gimbal_pitch_limit = 0.785  # rad 云台俯仰角限位，0.785rad≈45°
+max_speed = 6.0             # m/s 底盘最大直线速度
+linear_acceleration = 6.0  # m/s² 底盘线加速度
+acceleration_exponent = 2.5 # 非线性加速度曲线指数，起步加速柔和，高速增长放缓
 # Closed-loop tracking of external auto-aim (Talos/ROS2) gimbal commands.
 # Yaw and pitch are independent loops with independent gains.
+# 云台闭环跟踪：接收Talos/ROS2瞄准指令，yaw、pitch两套独立PID
+
 [vehicle.gimbal_pid.yaw]
-kp = 50.0
-ki = 0.0
-kd = 0.1
-integral_limit = 0.5            # rad*s - anti-windup bound on the integral term
-max_rate = 100.0                # rad/s - saturation of the commanded yaw rate
+kp = 50.0           # 云台yaw比例系数，大则响应快，过大会震荡
+ki = 0.0            # 积分项，0关闭积分，避免积分饱和
+kd = 0.1            # 微分项，抑制震荡
+integral_limit = 0.5# rad*s 积分限幅，防积分饱和anti-windup
+max_rate = 100.0    # rad/s 输出角速度限幅，防止云台转速超限
 
 [vehicle.gimbal_pid.pitch]
-kp = 50.0
-ki = 0.0
-kd = 0.1
-integral_limit = 0.5            # rad*s - anti-windup bound on the integral term
-max_rate = 100.0                # rad/s - saturation of the commanded pitch rate
+kp = 50.0           # 云台pitch比例系数
+ki = 0.0            # 积分系数
+kd = 0.1            # 微分系数
+integral_limit = 0.5# 积分限幅
+max_rate = 100.0    # pitch方向角速度限幅
 
 [mecanum]
-wheel_radius_m = 0.076          # wheel radius (m)
-half_wheelbase_m = 0.18         # half of front-rear wheel spacing (m)
-half_trackwidth_m = 0.15        # half of left-right wheel spacing (m)
+wheel_radius_m = 0.076       # 麦轮半径，单位米
+half_wheelbase_m = 0.18      # 前后轮距的一半
+half_trackwidth_m = 0.15     # 左右轮距的一半
 
 [projectile]
-lifetime = 5.0                  # seconds - projectile lifetime
-speed = 25.0                    # m/s - initial speed
-cooldown = 0.05                  # seconds - fire cooldown
-diameter = 0.017                # meters - projectile diameter (17mm)
-mass = 0.0032                    # kg - projectile mass (17g)
-friction = 1.1                  # friction coefficient
-linear_damping = 0.0            # linear damping (set to 0 for physics-based drag below)
-uav_vel = 5.0
-uav_size = 0.5
+lifetime = 5.0           # 弹丸存活最大时间，超过自动销毁
+speed = 25.0             # 弹丸初速度 m/s
+cooldown = 0.05          # 发射冷却时间，50ms
+diameter = 0.017         # 弹丸直径 17mm，RoboMaster17mm弹丸
+mass = 0.0032            # 弹丸质量 3.2g
+friction = 1.1           # 碰撞摩擦系数
+linear_damping = 0.0     # 线性阻尼，置0使用下面空气动力学模型
+uav_vel = 5.0            # 无人机目标速度参数
+uav_size = 0.5           # 无人机目标尺寸
 [projectile.aerodynamics]
-enabled = false                  # enable aerodynamic forces
-air_density = 1.225             # kg/m^3 - air density at sea level
-drag_coefficient = 0.22516         # Cd - smooth sphere drag coefficient
-wind = [0.0, 0.0, 0.0]          # m/s - wind velocity in world coordinates
+enabled = false          # 弹丸空气动力学开关，关闭：不计算弹道空气阻力，匀速直线；开启才会做弹道下坠
+air_density = 1.225      # kg/m³ 海平面空气密度
+drag_coefficient = 0.22516 # 球体风阻系数Cd
+wind = [0.0, 0.0, 0.0]   # 世界坐标系下风速 [x,y,z] m/s
 
 [camera]
-fov = 45.0                      # degrees - field of view
-free_move_speed = 8.0           # m/s - free camera movement speed
-follow_offset = [0.0, 3.0, 2.0] # follow camera offset
-mouse_sensitivity = 0.003       # mouse look sensitivity
+fov = 45.0                  # 自由相机视场角，单位度
+free_move_speed = 8.0       # 自由相机移动速度 m/s
+follow_offset = [0.0, 3.0, 2.0] # 跟随战车相机偏移 [x,y,z]
+mouse_sensitivity = 0.003   # 鼠标视角旋转灵敏度

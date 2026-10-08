@@ -1,43 +1,58 @@
 # dupast configuration file
 # Copy this to dupast.toml in your project root
+# dupast：基于AST抽象语法树的代码重复度检测工具，用于查找重复/拷贝粘贴代码
+# 把这份配置复制到项目根目录，命名 dupast.toml 即可生效
 
 # Similarity threshold (0.0 - 1.0)
 # Pairs with similarity below this threshold will not be reported
 # Can be overridden with: -t <PERCENT> or DUPAST_THRESHOLD env var
 threshold = 0.20
+# 相似度阈值，范围0~1。两段代码相似度低于该值，不会输出报告
+# 命令行参数 -t 或者环境变量 DUPAST_THRESHOLD 可以覆盖这个配置
 
 # Paths to scan when no CLI PATHS are provided
 # Supports files or directories, relative to current working directory
 paths = ["src"]
+# 扫描目录。命令行不指定路径时，默认扫描 src 文件夹，支持文件/目录，相对路径
 
 # Minimum tokens to consider as duplicate code block
 # Blocks (functions, statements) with fewer tokens than this will be ignored
 # Higher values reduce noise for very small functions
 # Can be overridden with: -L <N> or DUPAST_MIN_LINES env var
 min_block_lines = 3
+# 判定重复代码块的最小token行数。小于3行的代码片段直接忽略，减少大量短代码误报
+# -L 参数 / DUPAST_MIN_LINES 环境变量可覆盖
 
 # Check intra-file duplication
 # When true, also detects duplicates within the same file
 # Can be overridden with: --no-intra-file flag
 check_intra_file = true
+# 是否检测**同一个文件内部**的重复代码。true：开启；--no-intra-file 关闭
 
 # Output format
 # Options: "human", "json", "sarif"
 # Can be overridden with: -o <FORMAT> or DUPAST_OUTPUT_FORMAT env var
 output_format = "human"
+# 输出格式：
+# human：人类可读文本；json：json结构化；sarif：CI工具（github/gitlab）识别的标准漏洞报告格式
+# -o 参数 / DUPAST_OUTPUT_FORMAT 环境变量覆盖
 
 # File extensions to scan
 # Add or remove extensions based on your project
 extensions = ["c", "cpp", "cc", "cxx", "hpp", "h", "hxx", "go", "java", "js", "mjs", "cjs", "php", "rs", "ts", "tsx"]
+# 需要扫描的源代码后缀，你项目里 rs(Rust) / c/cpp/h 都会被扫描；不需要的后缀直接删掉
 
 # Maximum file size to process in bytes (default: 1MB)
 # Larger files are skipped to avoid memory issues
 max_file_size = 1_048_576
+# 单文件最大处理字节上限，1MB，超过这个大小的文件直接跳过，防止大文件吃爆内存
 
 # Number of parallel jobs (0 = CPU count)
 # Set to 1 to disable parallelism for debugging
 # Can be overridden with: -j <N> or DUPAST_JOBS env var
 jobs = 0
+# 并行检测线程数；0 = 自动使用全部CPU核心；调试时设为1关闭并行
+# -j 参数 / DUPAST_JOBS 环境变量覆盖
 
 # Frequency penalty for token similarity (0.0 - 10.0)
 # Higher values penalize common tokens more heavily
@@ -48,6 +63,9 @@ jobs = 0
 # This helps distinguish structural similarity from common boilerplate code
 # Can be overridden with: -F <PENALTY> or DUPAST_FREQUENCY_PENALTY env var
 frequency_penalty = 5.0
+# Token词频惩罚系数 0~10
+# 越高，对if/for/let这类通用关键字越不敏感；只看重项目独有的代码片段，规避模板样板代码误报
+# 5.0 强惩罚，只靠稀有token判定相似度；-F / DUPAST_FREQUENCY_PENALTY 可覆盖
 
 # Enable fuzzy identifier matching using semantic vectors
 # When true, detects similarity even when identifiers are renamed
@@ -56,6 +74,9 @@ frequency_penalty = 5.0
 # NOTE: Synonym graph (27KB) is only loaded when this is true
 # Can be overridden with: --fuzzy-identifiers flag or DUPAST_FUZZY_IDENTIFIERS env var
 fuzzy_identifiers = true
+# 开启标识符模糊语义匹配：变量/函数改名，依然能识别两段代码重复
+# 例：calc_target 和 compute_target 会被判定相似，底层用同义词词库
+# --fuzzy-identifiers / DUPAST_FUZZY_IDENTIFIERS 控制开关
 
 # Minimum similarity threshold for fuzzy identifier matching (0.0 - 1.0)
 # Only applies when fuzzy_identifiers = true
@@ -64,6 +85,8 @@ fuzzy_identifiers = true
 # 0.8 = strict (only very similar names)
 # Can be overridden with: --fuzzy-threshold <THRESHOLD> or DUPAST_FUZZY_THRESHOLD env var
 fuzzy_identifier_threshold = 0.2
+# 标识符名字语义相似度阈值，仅 fuzzy_identifiers=true 生效
+# 0.2 非常宽松，只要语义接近就算匹配，容易报很多；你可以改成0.6提高严格度
 
 # Color output model
 # Options: "auto", "always", "never"
@@ -72,8 +95,11 @@ fuzzy_identifier_threshold = 0.2
 # never: Never use colors
 # Can be overridden with: --color <WHEN> or DUPAST_COLOR env var
 # color = "auto"
+# 控制台颜色输出策略
+# auto：终端输出带颜色，管道输出不带；always一直着色；never关闭颜色
 
 # Quiet mode (suppress non-error output)
 # When true, only shows warnings/errors, no summary or progress
 # Can be overridden with: -q / --quiet flag or DUPAST_QUIET env var
 # quiet = false
+# 安静模式：开启后只输出错误警告，屏蔽进度、统计信息；-q 命令行开关控制

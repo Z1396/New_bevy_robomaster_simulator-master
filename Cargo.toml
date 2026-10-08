@@ -1,55 +1,70 @@
+# Cargo 工作区配置，Cargo.toml
 [workspace]
-members = [".", "crates/*"]
-resolver = "2"
+# 工作区包含的所有crate成员
+members = [".", "crates/*"]  # "." 代表当前根目录主包daedalus；crates/* 自动加载crates文件夹下所有子crate
+resolver = "2"               # Cargo依赖解析器版本，2是新版，解决很多依赖版本冲突，Rust1.64+支持
 
+# 工作区全局依赖，所有成员crate都能直接复用，统一版本
 [workspace.dependencies]
+# bevy游戏引擎，版本0.19
 bevy = { version = "0.19", features = ["dynamic_linking", "jpeg"] }
-avian3d = "0.7"
-bevy-inspector-egui = "0.37"
-memmap2 = { version = "0" }
+# dynamic_linking：动态链接，开发阶段编译速度快；发布release建议关掉
+# jpeg：开启jpeg图像编解码功能，正好对应你图像采集、发给talos的JPEG图像流
+avian3d = "0.7" # 3D物理引擎（Bevy的物理库，RoboMaster战车物理、弹丸碰撞都靠它）
+bevy-inspector-egui = "0.37" # egui可视化检视器，调试实体组件
+memmap2 = { version = "0" } # mmap内存映射库，talos ipc共享内存跨进程通信要用
 
+# 当前根包（daedalus仿真主程序）
 [package]
-name = "daedalus"
-version = "0.1.0"
-edition = "2024"
-default-run = "daedalus"
+name = "daedalus"          # 包名，编译出来exe名字就是daedalus.exe
+version = "0.1.0"          # 版本号
+edition = "2024"           # Rust语言edition 2024，启用新版语法
+default-run = "daedalus"   # cargo run 默认运行的二进制程序
 
+# 特性开关，条件编译，按需开启功能，不开启的依赖不会参与编译
 [features]
-ros2 = ["dep:r2r"]
-talos = ["dep:talos-ipc"]
-ffmpeg = ["dep:ffmpeg-next"]
-default = ["talos"]
+ros2 = ["dep:r2r"]                  # ros2特性：开启r2r ROS2绑定库
+talos = ["dep:talos-ipc"]           # talos特性：开启talos-ipc共享内存/网络桥，你的talos-net就在这里
+ffmpeg = ["dep:ffmpeg-next"]        # ffmpeg特性：ffmpeg图像编码
+default = ["talos"]                 # 默认编译启用talos特性，cargo run默认带talos支持
 
+# 当前包依赖项
 [dependencies]
-bevy = { workspace = true }
+bevy = { workspace = true }                 # 复用工作区定义的bevy，统一版本
 avian3d = { workspace = true }
 bevy-inspector-egui = { workspace = true }
-rand = "0.10"
-r2r = { version = "0", optional = true }
-talos-ipc = { path = "crates/talos-ipc", optional = true }
-crossbeam-channel = "0"
-image = "0"
-egui = "0"
-futures = "0"
-exact = { path = "crates/exact" }
-bevy_metalfx = { path = "crates/bevy_metalfx" }
-toml = "1"
-notify = "8"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-clap = { version = "4.6", features = ["derive"] }
-ffmpeg-next = { version = "8.1.0", optional = true }
+rand = "0.10"                                # 随机数库，生成随机目标、噪声等
+r2r = { version = "0", optional = true }    # r2r ROS2客户端，optional：只有开启ros2 feature才编译
+talos-ipc = { path = "crates/talos-ipc", optional = true } 
+# 本地子crate talos-ipc，就是你的共享内存、UDP/TCP网络桥代码，optional，talos feature启用
+crossbeam-channel = "0"                     # 高性能多线程无锁通道，线程间消息传递（UDP收包线程和bevy主线程通信）
+image = "0"                                  # 图像解码编码库，处理采集的RGB图像
+egui = "0"                                   # 即时UI库，调试面板
+futures = "0"                                # Rust异步futures，异步IO相关
+exact = { path = "crates/exact" }            # 本地子crate，项目内部工具库
+bevy_metalfx = { path = "crates/bevy_metalfx" } # macOS超分渲染本地插件
+toml = "1"                                   # 解析toml配置文件（就是上一段仿真配置）
+notify = "8"                                 # 文件监听，配置文件热重载
+serde = { version = "1", features = ["derive"] } # 序列化库，derive自动生成序列化代码（结构体转json）
+serde_json = "1"                             # json序列化，foxglove输出trace日志用
+clap = { version = "4.6", features = ["derive"] } # 命令行参数解析，启动参数
+ffmpeg-next = { version = "8.1.0", optional = true } # ffmpeg绑定，optional，ffmpeg feature开启
 
+# 额外二进制程序（除了默认daedalus之外的另一个可执行文件）
 [[bin]]
-name = "talos_gimbal_mock_server"
-path = "src/bin/talos_gimbal_mock_server.rs"
-required-features = ["talos", "ffmpeg"]
+name = "talos_gimbal_mock_server" # 二进制名：云台模拟服务器
+path = "src/bin/talos_gimbal_mock_server.rs" # 源码路径
+required-features = ["talos", "ffmpeg"] # 编译这个程序必须开启talos+ffmpeg特性
 
+# 补丁：替换crates.io上的包，使用本地修改版本
 [patch.crates-io]
 r2r_msg_gen = { path = "third_party/r2r_msg_gen" }
+# 把r2r_msg_gen这个库，替换成third_party下本地源码，用来自定义ROS消息生成
 
+# profile 编译优化配置
 [profile.dev.package."*"]
-opt-level = 3
+opt-level = 3  # dev模式下，所有第三方包全部开最高优化，加快第三方库运行速度，只把自己代码保留低优化
 
 [profile.dev]
-opt-level = 1
+opt-level = 1  # dev开发模式：本项目代码优化等级1，兼顾编译速度+运行性能
+
