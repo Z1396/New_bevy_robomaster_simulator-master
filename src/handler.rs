@@ -35,7 +35,8 @@ pub fn on_hit(
         return;
     };
     if ev.result.accurate() {
-        stats.increase_accurate();
+        // 【修改】符命中改用独立计数：原来混入 accurate_count 导致命中率口径混乱
+        stats.increase_rune_hit();
         //commands.spawn(AudioPlayer::new(asset_server.load("rune_activated.ogg")));
     }
 }

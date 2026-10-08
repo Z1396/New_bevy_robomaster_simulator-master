@@ -12,12 +12,14 @@ fn create_help_text(
     stats: &ProjectileStatistics,
     controller: &ControllerState,
 ) -> Text {
+    // 【修改】pct 显示为真正的百分比（修复前显示 0~1 小数）
     format!(
-        "auto-aim={} total={} accurate={} pct={:.2}\ncontroller={} mode={} gyro={} remote-gyro={}\n{}",
+        "auto-aim={} total={} accurate={} pct={:.0}% rune={}\ncontroller={} mode={} gyro={} remote-gyro={}\n{}",
         if auto_aim { "ON " } else { "OFF" },
         stats.launch_count,
         stats.accurate_count,
-        stats.accurate_pct(),
+        stats.accurate_pct() * 100.0,
+        stats.rune_hit_count,
         controller.help_source(),
         controller.help_mode(),
         if controller.controlled_chassis_spin() {

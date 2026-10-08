@@ -62,9 +62,14 @@ pub fn projectile_launch(
     cooldown.reset();
 
     stats.increase_launch();
-    let direction = (gimbal.0.rotation() * launch_offset.rotation)
-        .mul_vec3(Vec3::Y)
-        .normalize_or_zero();
+    // 【修改】弹道方向复用第一人称相机（systems/camera.rs Robot 模式）的旋转合成，
+    // 取变换后的局部 -Z。原实现取局部 +Y，与相机视线（同一合成变换下的 -Z）垂直，
+    // 云台水平时子弹恒上扬形成抛物线，准星指哪打不哪。
+    // Rz(90°) 是 Bevy 相机朝向修正，与 camera.rs 保持完全一致（数学上它不改变 -Z 方向）。
+    let direction = (gimbal.0.rotation() * launch_offset.rotation
+        * Quat::from_euler(EulerRot::ZYX, 0.0, 0.0, PI / 2.0))
+    .mul_vec3(Vec3::NEG_Z)
+    .normalize_or_zero();
     if direction == Vec3::ZERO {
         return;
     }
