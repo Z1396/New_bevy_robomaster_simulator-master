@@ -1,5 +1,19 @@
+//! RoboMaster 领域的**公共词汇表**：阵营、机型、机型配置常量。
+//!
+//! 本文件是全项目被引用最广的定义之一（通过 `robomaster::prelude::*` 再导出），
+//! 内容不多但都是"业务名词"，读代码时遇到的 `Team::Red`、`Robot::Hero`、`INFANTRY_THREE_CONFIG`
+//! 都出自这里。三块内容：
+//! - `Team`：红/蓝阵营，并提供从字符串解析的 `Team::from`（读配置/资源时用）；
+//! - `RobotConfig` + 四个机型常量：每个机型用哪种装甲、装几块（armor_count）；
+//! - `Robot`：九类机器人机种的领域枚举（英雄/工程/步兵/空中/哨兵/飞镖/雷达）。
+//!
+//! 这些类型都派生 `Debug, Copy, Clone, Hash, PartialEq, Eq`：可打印、可廉价复制、可作 map 键、
+//! 可精确相等比较——对"小而无字段的枚举/常量结构"是标准配置。
+
 use crate::robomaster::prelude::*;
 
+/// 比赛阵营。
+/// 红蓝两方几乎所有逻辑都要比较阵营（判断敌我、选择灯光颜色、镜像场地等）。
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub enum Team {
     Red,
@@ -7,6 +21,9 @@ pub enum Team {
 }
 
 impl Team {
+    /// 从字符串解析阵营：`"red"`/`"blue"`（大小写不敏感，先 `to_lowercase`）。
+    /// 返回 `Option<Self>`——解析不了（如拼写错误）返回 `None`，由调用方决定如何兜底。
+    /// 调用时机：读取配置文件、场景元数据里的阵营字段时。
     pub fn from(name: &str) -> Option<Self> {
         match name.to_lowercase().as_str() {
             "red" => Some(Team::Red),
@@ -16,6 +33,8 @@ impl Team {
     }
 }
 
+/// 单个机型的配置：用哪套装甲规格 + 装几块装甲板。
+/// 装甲板数量 `armor_count` 是命中判定的依据之一（打满即可摧毁该车）。
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub struct RobotConfig {
     pub armor: ArmorSpec,
@@ -23,11 +42,15 @@ pub struct RobotConfig {
 }
 
 impl RobotConfig {
+    // `const fn`：编译期即可求值的构造函数——因为下面的四个机型常量要在编译期初始化，必须用它。
     pub const fn new(armor: ArmorSpec, armor_count: usize) -> Self {
         Self { armor, armor_count }
     }
 }
 
+// 四个机型的标准配置常量（`const`：编译期常量，使用时按值内联，无运行时开销）。
+// 装甲规格：英雄用大装甲(Large)、其余用对应编号的小装甲(Small)。
+// `armor_count = 4`：RoboMaster 规则里这几类车均为四周 4 块装甲板——改动即改变承伤次数。
 pub const HERO_ROBOT_CONFIG: RobotConfig =
     RobotConfig::new(ArmorSpec::Large(LargeArmorLabel::One), 4);
 pub const ENGINEER_ROBOT_CONFIG: RobotConfig =
@@ -37,6 +60,8 @@ pub const INFANTRY_THREE_CONFIG: RobotConfig =
 pub const INFANTRY_FOUR_CONFIG: RobotConfig =
     RobotConfig::new(ArmorSpec::Small(SmallArmorLabel::Four), 4);
 
+/// 机器人机种（对应 RoboMaster 赛场上的各类单位）。
+/// 枚举用于区分行为、能力与外观（如是否可发射、能否飞行、装甲规格）。
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub enum Robot {
     /// 英雄机器人 - 唯一可以发射42mm弹丸的机器人
@@ -79,6 +104,7 @@ pub enum Robot {
 mod tests {
     use super::*;
 
+    // 回归测试：确保四个机型常量的装甲类型/标签/数量不被误改（`cargo test` 时运行）。
     #[test]
     fn robot_configs_preserve_legacy_armor_values() {
         let cases = [
