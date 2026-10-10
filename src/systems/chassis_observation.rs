@@ -64,10 +64,11 @@ pub struct PreviousKinematicState {
 
 /// 每帧更新底盘观测帧（PostUpdate，`.after(TransformSystems::Propagate)`）。
 pub fn update_chassis_observation(
-    time: Res<Time>,
-    config: Res<SimulationConfig>,
-    mut frame: ResMut<ChassisObservationFrame>,
-    mut previous: ResMut<PreviousKinematicState>,
+    time: Res<Time>,     // 时间资源，用于计算时间戳和间隔
+    config: Res<SimulationConfig>, // 模拟配置资源，用于获取轮半径
+    mut frame: ResMut<ChassisObservationFrame>, // 底盘观测帧资源，用于存储最新观测
+    mut previous: ResMut<PreviousKinematicState>,// 上一帧的运动学状态，用于差分求加速度
+    // 查询所有受控制的兵，确保只处理当前帧的观测。
     chassis: Query<
         (&GlobalTransform, &LinearVelocity, &AngularVelocity),
         (With<Infantry>, With<Controlled>),
@@ -79,13 +80,11 @@ pub fn update_chassis_observation(
         *previous = PreviousKinematicState::default();
         return;
     };
+    // 计算当前帧的时间戳和间隔
+    let stamp_s = time.elapsed_secs_f64();// 采样时刻（秒）
+    let dt_s = time.delta_secs();   // 距上一帧的间隔（秒）
+    let rotation = chassis_tf.compute_transform().rotation;// 车身旋转矩阵
 
-    let stamp_s = time.elapsed_secs_f64();
-    let dt_s = time.delta_secs();
-    let rotation = chassis_tf.compute_transform().rotation;
-
-    // Convert from world velocity to chassis-local velocity, then remap Bevy axes
-    // (right, up, back) to body axes (forward, left, up).
     // 中译：先把世界系速度旋到车身本地系（`rotation.inverse() * v`），再把 Bevy 轴
     //（右, 上, 后）× 重映射为机体轴（前, 左, 上）。
     let linear_local_bevy = rotation.inverse() * linear_velocity.0;
@@ -108,7 +107,7 @@ pub fn update_chassis_observation(
     // 线速度 → 角速度：ω = v / r。
     let wheel_angular_radps =
         wheel_linear_to_angular(wheel_linear_mps, config.mecanum.wheel_radius_m);
-
+    // 存储当前帧的观测
     *frame = ChassisObservationFrame {
         stamp_s,
         dt_s,

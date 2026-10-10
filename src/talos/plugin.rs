@@ -44,8 +44,8 @@ pub struct TalosEnabled(pub AtomicBool);
 pub struct TalosPluginConfig {
     pub width: u32,
     pub height: u32,
-    pub fov_y: f32,
-    pub texture_format: TextureFormat,
+    pub fov_y: f32, //fov_y 视场角（弧度）
+    pub texture_format: TextureFormat,// 纹理像素格式（Rgba8UnormSrgb: 离屏捕获）
 }
 
 impl Default for TalosPluginConfig {
@@ -97,7 +97,7 @@ impl Plugin for TalosPlugin {
         // 捕获上下文：发布端句柄 + 视场角（弧度），随捕获插件一起注入。
         let capture_context = TalosCaptureContext {
             publisher: publisher.clone(), // `.clone()` 只增引用计数，不拷贝底层数据
-            fov_y: self.config.fov_y,
+            fov_y: self.config.fov_y, //fov_y 视场角（弧度）
         };
 
         // 帧序号/时间戳资源：每帧在 Last 阶段递增（见 capture.rs）。
@@ -120,15 +120,19 @@ impl Plugin for TalosPlugin {
         // 总开关：初值 true（但真正是否回传自瞄指令由 SubscribeAutoAim 另行门控）。
         app.insert_resource(TalosEnabled(AtomicBool::new(true)));
         // `Last` = 每帧最末阶段。先递增帧号/时间戳，再发心跳（保证心跳带最新时间）。
+        // `advance_talos_frame_stamp`：递增帧号/时间戳，单位 ns。
+        // `heartbeat_system`：发送心跳，单位 ns。
         app.add_systems(Last, (advance_talos_frame_stamp, heartbeat_system));
         // `.after(...)` 显式排序：运行状态要在帧号更新之后发出，才能带上正确时间戳。
         app.add_systems(
-            Last,
+            Last,//Last 阶段(表示每帧最末阶段)。
+            // `publish_talos_runtime_state_system`：发布运行状态，单位 ns。
+            // `after(advance_talos_frame_stamp)`：在递增帧号/时间戳之后运行，确保时间戳正确。
             publish_talos_runtime_state_system.after(advance_talos_frame_stamp),
         );
         // 真值又排在运行状态之后，形成 advance → runtime_state → ground_truth 的链。
         app.add_systems(
-            Last,
+            Last,//Last 阶段(表示每帧最末阶段)。
             crate::talos::ground_truth::publish_ground_truth_system
                 .after(publish_talos_runtime_state_system),
         );
@@ -156,13 +160,14 @@ fn process_subscription(
     gimbal: Single<
         (Entity, Option<&mut GimbalAimTracker>),
         (
-            With<Controlled>,
-            With<InfantryGimbal>,
-            Without<InfantryChassis>,
-            Without<InfantryLaunchOffset>,
+            With<Controlled>,// 本机受控
+            With<InfantryGimbal>,// 纯云台实体
+            Without<InfantryChassis>,// 不带底盘组件
+            Without<InfantryLaunchOffset>,// 不带发射口组件
         ),
     >,
 ) {
+    // 捕获上下文
     let Some(ctx) = context else {
         return;
     };

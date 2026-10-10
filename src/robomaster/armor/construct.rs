@@ -541,15 +541,21 @@ fn insert(
         let name = constructor.name;
         // 找到整棵子树里所有名字含 "ARMOR_ROOT" 的实体（同一模型可能有多块装甲）。
         children
+            // `iter_descendants`：递归遍历子树，包括所有子节点。
             .iter_descendants(root_entity)
+            // `filter_map`：对每个子节点应用闭包，返回 Some((子节点, 名字)) 或 None。
+            // 这里过滤出名字包含 "ARMOR_ROOT" 的子节点。
             .filter_map(|child| {
                 name.get(child)
                     .ok()
                     .filter(|name| name.contains("ARMOR_ROOT")) // `contains`：子串匹配
                     .map(|name| (child, name))
             })
+            // `for_each`：对每个过滤后的子节点应用闭包。
+            // 这里对每个装甲根调用组装逻辑，复制名字，避免借用冲突。
             .for_each(|(ent, name)| {
-                // 对每个装甲根调用组装逻辑；`to_string()` 复制名字，避免借用冲突。
+                // 对每个装甲根调用组装逻辑；`to_string()` 复制名字，避免借用冲突。最后传递装甲数据。
+                // 这里假设每个装甲根只处理一个装甲部件，所以直接传递 `armor_data`。
                 constructor.process_armor_root(ent, name.to_string(), armor_data);
             })
     }

@@ -79,16 +79,15 @@ pub fn vehicle_controls(
     time: Res<Time>,
     controller: Res<ControllerState>,
     config: Res<SimulationConfig>,
-    // `Forces` 是 avian 的"施力入口"；`&Mass` 读质量；`&mut VehicleDynamic` 用其非线性加速模型。
+    // `Forces` 是 avian（bevy 版本） 的"施力入口(意思就是输入的力)"；`&Mass` 读质量；`&mut VehicleDynamic` 用其非线性加速模型。
+    // (With<Infantry>, With<Controlled>) 表示只作用于本机玩家操控的战车
     infantry: Single<(Forces, &Mass, &mut VehicleDynamic), (With<Infantry>, With<Controlled>)>,
     // 云台（提供前进方向的参考坐标系）：底盘节点被 `Without<InfantryChassis>` 排除。
-    gimbal: Single<
-        (&GlobalTransform, &InfantryGimbal),
-        (With<Controlled>, Without<InfantryChassis>),
-    >,
+    // (GlobalTransform, &InfantryGimbal) 表示云台的全局变换和云台组件
+    // (With<Controlled>, Without<InfantryChassis>) 表示只作用于本机玩家操控的战车的云台
+    gimbal: Single<(&GlobalTransform, &InfantryGimbal), (With<Controlled>, Without<InfantryChassis>)>,
     // 底盘节点：要求有 InfantryChassis、无 InfantryGimbal（与上面正好互补），排除根实体 Infantry。
-    chassis: Single<
-        (&mut Transform, &mut InfantryChassis),
+    chassis: Single<(&mut Transform, &mut InfantryChassis),
         (
             With<Controlled>,
             Without<InfantryGimbal>,
@@ -97,20 +96,23 @@ pub fn vehicle_controls(
         ),
     >,
 ) {
+    // 从控制器中获取输入
     let controller = controller.controlled;
     let input = controller.movement; // Vec2：x=左右，y=前后，各 -1..1
     let boost = controller.boost_multiplier(); // 加速倍率（未按加速键为 1.0）
-
+    // 从战车中获取力、质量、动态组件
     let (mut forces, &Mass(mass), mut dynamic) = infantry.into_inner();
 
     // dt 单位秒；`linear` 内部会按质量与 dt 施加冲量（见 vehicle/movement.rs）。
     let dt = time.delta_secs();
+    // 底盘线性力：输入 → 底盘线性力 + 底盘姿态（Input 阶段；自由相机下被跳过）
+    // 参数单位：速度均为 弧度/秒，加速度 弧度/秒²，dt 为秒。
     dynamic.linear(
         &mut forces,
-        mass,
+        mass, // 质量
         gimbal.into_inner().0, // 以云台朝向为"前进方向"参考（车会朝云台指的方向走）
         input,
-        time.delta_secs(),
+        dt,
         boost,
     );
 
@@ -130,15 +132,13 @@ pub fn vehicle_controls(
 
 /// 遥控底盘驾驶：作用于被 Tab 选中的 AI 车（`ActiveSlapper`），逻辑与 `vehicle_controls` 同构。
 pub fn remote_vehicle_controls(
-    time: Res<Time>,
-    controller: Res<ControllerState>,
-    config: Res<SimulationConfig>,
-    infantry: Single<
-        (&GlobalTransform, Forces, &Mass, &mut VehicleDynamic),
-        (With<ActiveSlapper>, With<Infantry>, Without<Controlled>),
-    >,
-    chassis: Single<
-        (&mut Transform, &mut InfantryChassis),
+    time: Res<Time>,// 时间组件
+    controller: Res<ControllerState>,// 控制器状态
+    config: Res<SimulationConfig>,// 模拟配置
+    // (With<ActiveSlapper>, With<Infantry>, Without<Controlled>) 表示只作用于被 Tab 选中的 AI 车
+    infantry: Single<(&GlobalTransform, Forces, &Mass, &mut VehicleDynamic),(With<ActiveSlapper>, With<Infantry>, Without<Controlled>),>,
+    // (With<ActiveSlapper>, With<InfantryChassis>, Without<InfantryGimbal>, Without<Infantry>) 表示只作用于被 Tab 选中的 AI 车的底盘
+    chassis: Single<(&mut Transform, &mut InfantryChassis),
         (
             With<ActiveSlapper>,
             With<InfantryChassis>,
@@ -147,46 +147,47 @@ pub fn remote_vehicle_controls(
         ),
     >,
 ) {
+    // 从控制器中获取输入
     let controller = controller.remote;
-    let input = controller.movement;
-    let boost = controller.boost_multiplier();
-
+    let input = controller.movement; // Vec2：x=左右，y=前后，各 -1..1
+    let boost = controller.boost_multiplier(); // 加速倍率（未按加速键为 1.0）
+    // 从战车中获取力、质量、动态组件
     let (infantry_global_transform, mut forces, &Mass(mass), mut dynamic) = infantry.into_inner();
 
     let dt = time.delta_secs();
     dynamic.linear(
-        &mut forces,
-        mass,
+        &mut forces,    // 底盘线性力
+        mass, // 质量
         infantry_global_transform, // 遥控车用自身朝向作前进参考（本机用云台朝向）
-        input,
-        time.delta_secs(),
-        boost,
+        input,// 输入的移动向量（x=左右，y=前后，各 -1..1）
+        dt,// 从上一帧到当前帧时间步长（秒）
+        boost,// 加速倍率（未按加速键为 1.0）
     );
-
+    // 底盘姿态：输入 → 底盘姿态（Input 阶段；自由相机下被跳过）
+    // 参数单位：速度均为 弧度/秒，加速度 弧度/秒²，dt 为秒。
     let (mut chassis_transform, mut chassis_data) = chassis.into_inner();
     update_chassis_rotation(
-        &mut chassis_transform,
-        &mut chassis_data,
-        controller.chassis_yaw,
-        controller.chassis_roll,
-        controller.chassis_pitch,
-        config.vehicle.rotation_speed,
-        config.vehicle.yaw_acceleration,
-        config.vehicle.tilt_rotation_speed,
-        dt,
+        &mut chassis_transform,// 底盘节点变换
+        &mut chassis_data,// 底盘组件
+        controller.chassis_yaw,// 底盘横滚角度（弧度）
+        controller.chassis_roll,// 底盘俯仰角度（弧度）
+        controller.chassis_pitch,// 底盘俯仰角度（弧度）
+        config.vehicle.rotation_speed,// 底盘旋转速度（弧度/秒）
+        config.vehicle.yaw_acceleration,// 底盘横滚加速度（弧度/秒²）
+        config.vehicle.tilt_rotation_speed,// 底盘俯仰旋转速度（弧度/秒）
+        dt,// 从上一帧到当前帧时间步长（秒）
     );
 }
 
 /// 本机云台手动瞄准（自瞄订阅开启时交给 gimbal_pid 接管，本系统直接返回）。
+/// 本机云台手动瞄准（自瞄订阅开启时交给 gimbal_pid 接管，本系统直接返回）。
 pub fn gimbal_controls(
-    time: Res<Time>,
-    controller: Res<ControllerState>,
-    enabled: Res<SubscribeAutoAim>,
-    config: Res<SimulationConfig>,
-    gimbal: Single<
-        (&mut Transform, &mut InfantryGimbal),
-        (With<Controlled>, Without<InfantryChassis>),
-    >,
+    time: Res<Time>,// 时间组件
+    controller: Res<ControllerState>,// 控制器状态
+    enabled: Res<SubscribeAutoAim>,// 自瞄订阅状态
+    config: Res<SimulationConfig>,// 模拟配置
+    // (With<Controlled>, Without<InfantryChassis>) 表示只作用于被 Tab 选中的 AI 车的云台
+    gimbal: Single<(&mut Transform, &mut InfantryGimbal),(With<Controlled>, Without<InfantryChassis>),>,
 ) {
     // 自瞄开启时不接受手动输入，避免两套控制互相打架。
     if enabled.load(Ordering::Acquire) {
@@ -194,12 +195,13 @@ pub fn gimbal_controls(
     }
 
     let dt = time.delta_secs();
+    // 从云台中获取变换、组件
     let (mut gimbal_transform, mut gimbal_data) = gimbal.into_inner();
 
     // 反向同步：先把当前旋转解算成 yaw/pitch 写回组件，保证组件状态与 Transform 一致。
-    (gimbal_data.local_yaw, gimbal_data.pitch, _) =
-        gimbal_transform.rotation.to_euler(EulerRot::YXZ);
+    (gimbal_data.local_yaw, gimbal_data.pitch, _) = gimbal_transform.rotation.to_euler(EulerRot::YXZ);
 
+    // 从控制器中获取输入
     let controller = controller.controlled;
     // 转角增量 = 速度(rad/s) × 输入 × 精度缩放 × dt。
     let rotation_speed = config.vehicle.gimbal_rotation_speed * controller.gimbal_scale() * dt;
@@ -211,42 +213,48 @@ pub fn gimbal_controls(
         -config.vehicle.gimbal_pitch_limit,
         config.vehicle.gimbal_pitch_limit,
     );
-
+    // 云台姿态：输入 → 云台姿态（Input 阶段；自由相机下被跳过）
+    // 参数单位：速度均为 弧度/秒，加速度 弧度/秒²，dt 为秒。
     let gimbal_rotation =
         Quat::from_euler(EulerRot::YXZ, gimbal_data.local_yaw, gimbal_data.pitch, 0.0);
 
-    gimbal_transform.rotation = gimbal_rotation;
+    gimbal_transform.rotation = gimbal_rotation;// 更新云台变换
 }
 
 /// 遥控云台瞄准：作用于被选中的 AI 车，逻辑与 `gimbal_controls` 同构（不受自瞄开关影响）。
 pub fn remote_gimbal_controls(
-    time: Res<Time>,
-    controller: Res<ControllerState>,
-    config: Res<SimulationConfig>,
+    time: Res<Time>, // 时间组件
+    controller: Res<ControllerState>,// 控制器状态
+    config: Res<SimulationConfig>,// 模拟配置
+    // (With<ActiveSlapper>, Without<InfantryChassis>) 表示只作用于被 Tab 选中的 AI 车的云台
     gimbal: Single<
         (&mut Transform, &mut InfantryGimbal),
         (With<ActiveSlapper>, Without<InfantryChassis>),
     >,
 ) {
     let dt = time.delta_secs();
+    // 从云台中获取变换、组件
     let (mut gimbal_transform, mut gimbal_data) = gimbal.into_inner();
-
+    // 反向同步：先把当前旋转解算成 yaw/pitch 写回组件，保证组件状态与 Transform 一致。
     (gimbal_data.local_yaw, gimbal_data.pitch, _) =
-        gimbal_transform.rotation.to_euler(EulerRot::YXZ);
+        gimbal_transform.rotation.to_euler(EulerRot::YXZ);// 云台本体系下的 yaw, pitch
 
+    // 从控制器中获取输入
     let controller = controller.remote;
-    let rotation_speed = config.vehicle.gimbal_rotation_speed * controller.gimbal_scale() * dt;
-    gimbal_data.local_yaw += controller.gimbal.x * rotation_speed;
-    gimbal_data.pitch += controller.gimbal.y * rotation_speed;
+    let rotation_speed = config.vehicle.gimbal_rotation_speed * controller.gimbal_scale() * dt; // 云台旋转速度（弧度/秒）
+    gimbal_data.local_yaw += controller.gimbal.x * rotation_speed; // 累加 yaw 角度
+    gimbal_data.pitch += controller.gimbal.y * rotation_speed; // 累加 pitch 角度
+    // 俯仰夹在配置的上下限内（config 的 gimbal_pitch_limit，单位弧度）。
     gimbal_data.pitch = gimbal_data.pitch.clamp(
         -config.vehicle.gimbal_pitch_limit,
         config.vehicle.gimbal_pitch_limit,
     );
-
+    // 云台姿态：输入 → 云台姿态（Input 阶段；自由相机下被跳过）
+    // 参数单位：速度均为 弧度/秒，加速度 弧度/秒²，dt 为秒。
     let gimbal_rotation =
         Quat::from_euler(EulerRot::YXZ, gimbal_data.local_yaw, gimbal_data.pitch, 0.0);
 
-    gimbal_transform.rotation = gimbal_rotation;
+    gimbal_transform.rotation = gimbal_rotation;// 更新云台变换
 }
 
 /// Tab 切换"操控哪台车"：把 `ActiveSlapper` 从当前车摘掉、挂到环形序列的下一台。
@@ -265,6 +273,7 @@ pub fn switch_slapper_control(
     // 只关心"是否是展示战车"，不要数据 → `Query<(), With<Spinning>>`。
     spinning_roots: Query<(), With<Spinning>>,
 ) {
+    // Tab 键按下时才切换
     if !controller.controlled.switch_slapper_just_pressed {
         return;
     }
@@ -274,9 +283,12 @@ pub fn switch_slapper_control(
         return; // 只有一台可切换车时无意义
     }
 
-    // 找当前车在列表里的下标，取环形下一个；找不到（尚未选中任何车）则从 0 开始。
+    // active_root.single() 返回当前被选中的那台车（如果有）；.ok() 表示如果查询失败（没有选中车），则返回 None 而不是 panic
+    // 到下一行的 `and_then` 中处理 None 情况。
     let current = active_root.single().ok();
+    // current.and_then(|e| roots.iter().position(|&r| r == e))：如果 `current` 有值，返回 `roots` 中 `e` 的下标；否则返回 None
     let current_idx = current.and_then(|e| roots.iter().position(|&r| r == e));
+    // 判断是否有当前车的下标，有则计算下一个一台的下标，无则从0开始
     let next_idx = match current_idx {
         Some(idx) => (idx + 1) % roots.len(),
         None => 0,
@@ -293,17 +305,20 @@ pub fn switch_slapper_control(
     // 切走时什么都不做：ActiveSlapper 被移除后，自转系统（spin_display_vehicle）
     // 下帧自动恢复匹配，接管角速度与角阻尼。
 
-    // Add ActiveSlapper to next
+    // 切换到下一个一台车
     let next_root = roots[next_idx];
+    // 判断下一个车是否是展示战车
+    // 展示战车被选中：同批瞬间刹停（角速度清零 + 角阻尼恢复），防止残留自转导致操控时车身抖动侧翻。
+    // Spinning 组件全程不摘不挂，切换状态完全由 ActiveSlapper 的有无决定。
     if spinning_roots.contains(next_root) {
-        // 展示战车被选中：同批瞬间刹停（角速度清零 + 角阻尼恢复 setup_vehicle
-        // 实配值 50.0），防止残留自转导致操控时车身抖动侧翻。
-        // Spinning 组件全程不摘不挂，切换状态完全由 ActiveSlapper 的有无决定。
         commands.entity(next_root).insert((
+            // AngularVelocity表示角速度设置为0
             AngularVelocity(Vec3::ZERO),
+            // AngularDamping表示角阻尼恢复为 setup_vehicle 实配值 50.0
             AngularDamping(50.0),
         ));
     }
+    // 挂载 ActiveSlapper 到next_root的根实体及其所有后代实体
     commands.entity(next_root).insert(ActiveSlapper);
     for descendant in children.iter_descendants(next_root) {
         commands.entity(descendant).insert(ActiveSlapper);

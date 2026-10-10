@@ -225,10 +225,10 @@ pub enum CapturedFrameKind {
 /// 一次捕获的配置：尺寸（单位：像素）、源纹理格式、目标产物帧类型。
 #[derive(Resource, Clone)]
 pub struct CaptureConfig {
-    pub width: u32,
-    pub height: u32,
-    pub texture_format: TextureFormat,
-    pub frame_kind: CapturedFrameKind,
+    pub width: u32, // 捕获图像的宽度（单位：像素）
+    pub height: u32, // 捕获图像的高度（单位：像素）
+    pub texture_format: TextureFormat,// 纹理像素格式（Rgba8UnormSrgb: 离屏捕获）
+    pub frame_kind: CapturedFrameKind, // 目标产物帧类型
 }
 
 /// 交给订阅者回调的只读帧视图。`<'a>` 是生命周期标注：`data` 只是借用外部缓冲，

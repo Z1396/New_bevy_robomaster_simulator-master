@@ -11,8 +11,8 @@ use crate::components::{
 
 /// 按 P 键生成 UAV（调度在 PostUpdate，需在 Transform 传播之后取炮口的最新世界坐标）。
 pub fn uav_launch(
-    time: Res<Time>,
-    mut commands: Commands,
+    time: Res<Time>,  // 时间组件，用于获取当前时间间隔。
+    mut commands: Commands, // 命令组件，用于创建新实体。
     // `Single<...>`：断言"恰好一个"匹配实体，0 个或多个都会 panic——这里断言玩家车唯一。
     // `(With<Infantry>, With<Controlled>)` 即"玩家操控的步兵车"。
     infantry: Single<
@@ -24,6 +24,8 @@ pub fn uav_launch(
         (&GlobalTransform, &InfantryGimbal),
         (With<Controlled>, Without<InfantryChassis>),
     >,
+    // 资产服务器：用于加载 glTF 资产。
+    // `Res<T>`：资源组件，用于获取资产。
     asset_server: Res<AssetServer>,
     // 炮口节点（glTF 的 SHOT_DIRECTION）。
     launch_offset: Single<&Transform, (With<Controlled>, With<InfantryLaunchOffset>)>,

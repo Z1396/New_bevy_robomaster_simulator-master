@@ -117,11 +117,14 @@ impl Plugin for ScenePlugin {
     fn build(&self, app: &mut App) {
         // `AsyncWorldTask` 是"一个正在运行的异步加载任务"，作为全局资源存放；
         // `load_scene` 是任务函数体（接收 AsyncWorld 句柄、返回 Future）。
-        app.insert_resource(AsyncWorldTask::new(load_scene))
+        app.insert_resource(AsyncWorldTask::new(load_scene))//场景加载任务
             // `PreUpdate` 每帧在最前驱动这个任务；`run_if(resource_exists::<..>)` 使任务一旦
             // 完成（资源被移除）本系统自动停跑，不再空转。
             .add_systems(
+                //PreUpdate 系统：每帧在最前驱动场景加载任务，直到完成（资源被移除）才停跑
                 PreUpdate,
+                //drive_async_world 系统：驱动场景加载任务，直到完成（资源被移除）才停跑
+                //resource_exists::<AsyncWorldTask>：判断场景加载任务是否存在，存在则运行，否则则不运行
                 drive_async_world.run_if(resource_exists::<AsyncWorldTask>),
             );
     }
@@ -282,7 +285,9 @@ async fn load_scene(w: AsyncWorld) {
             (
                 Transform::from_xyz(2.0, 1.0, 1.0),
                 Infantry::new(Team::Blue, HERO_ROBOT_CONFIG),
+                //slapperInfantry 表示"可被 Tab 选中操控的 AI 车"
                 SlapperInfantry,
+                //ActiveSlapper 表示"启动时默认选中的那台可操控车"
                 ActiveSlapper,
             ),
         )

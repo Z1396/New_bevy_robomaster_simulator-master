@@ -34,13 +34,13 @@ impl ShmPublisher {
             // 写入头部：magic/version 供读端校验兼容性，时间戳用于判断发布端是否存活（心跳），
             // 尺寸字段让读端按发布端实际分辨率解释图像缓冲。
             meta.header = ShmHeader {
-                magic: SHM_MAGIC,
-                version: SHM_VERSION,
-                created_ns: Self::now_ns(),
-                heartbeat_ns: Self::now_ns(),
-                image_width: IMAGE_WIDTH,
-                image_height: IMAGE_HEIGHT,
-                _pad: [0; 32],
+                magic: SHM_MAGIC, // 校验兼容性，防止读端读取错误数据。
+                version: SHM_VERSION, // 版本号，用于判断发布端是否兼容读端。
+                created_ns: Self::now_ns(),// - `created_ns`：创建时间，单位纳秒。
+                heartbeat_ns: Self::now_ns(),// - `heartbeat_ns`：心跳时间戳，单位纳秒。
+                image_width: IMAGE_WIDTH,// // 图像宽度，单位像素。
+                image_height: IMAGE_HEIGHT,// // 图像高度，单位像素。
+                _pad: [0; 32],  // 预留字段，用于未来扩展。
             };
 
             // 把每个三缓冲的控制字重设为合法初态（CRITICAL：操作系统给共享内存的零填充会把
@@ -54,10 +54,10 @@ impl ShmPublisher {
         }
 
         Ok(Self {
-            meta_region,
-            image_pool,
-            current_buffer_id: 0,
-            last_synchronized_frame_seq: None,
+            meta_region,// 元数据区（ShmMetaRegion 布局）
+            image_pool,// 图像像素池（3 帧轮转）
+            current_buffer_id: 0,// 当前要写入的图像 buffer 下标（0..=2）
+            last_synchronized_frame_seq: None,// 上一次成功同步发布的帧号（防回退/重发）
         })
     }
 
@@ -69,11 +69,11 @@ impl ShmPublisher {
     /// 图像发布核心：先拷像素到图像池，再提交元数据（元数据提交 = 读者可见的"完成标记"）。
     /// `before_commit` 在像素拷完、元数据提交前调用——让调用方把"配套数据"（如位姿）一起提交。
     pub fn publish_image_with<F>(
-        &mut self,
-        data: &[u8],
-        seq: u64,
-        timestamp_ns: u64,
-        before_commit: F,
+        &mut self,  
+        data: &[u8],     // 图像像素数据，必须是 `IMAGE_SIZE` 字节的 RGB8。
+        seq: u64,        // 帧号，用于判断是否跳帧。
+        timestamp_ns: u64,// 采集时刻，单位纳秒。
+        before_commit: F,// 图像发布前调用，用于提交配套数据（如位姿）。
     ) where
         F: FnOnce(&mut Self),
     {
@@ -103,13 +103,14 @@ impl ShmPublisher {
                 &mut meta.image.write_idx,
                 &mut meta.image.slots,
             );
-
+            // 写入图像元数据槽：seq/timestamp_ns/width/height/buffer_id/format。
             let slot = producer.borrow_mut();
-            slot.seq = seq;
-            slot.timestamp_ns = timestamp_ns;
-            slot.width = IMAGE_WIDTH;
-            slot.height = IMAGE_HEIGHT;
+            slot.seq = seq; // 帧号，用于判断是否跳帧。
+            slot.timestamp_ns = timestamp_ns; // 采集时刻，单位纳秒。
+            slot.width = IMAGE_WIDTH; // 图像宽度，单位像素。
+            slot.height = IMAGE_HEIGHT;// 图像高度，单位像素。
             slot.buffer_id = buffer_id; // 告知读者像素在池中哪一块
+            // `format`：图像格式，固定值 `0`（RGB8）。
             slot.format = 0; // 0 = RGB8
             producer.publish();
         }
@@ -120,11 +121,11 @@ impl ShmPublisher {
     /// （false 表示本帧被跳过，调用方通常应知悉）。
     #[must_use]
     pub fn try_publish_synchronized_image<F>(
-        &mut self,
-        data: &[u8],
-        seq: u64,
-        timestamp_ns: u64,
-        before_commit: F,
+        &mut self,  
+        data: &[u8],     // 图像像素数据，必须是 `IMAGE_SIZE` 字节的 RGB8。
+        seq: u64,        // 帧号，用于判断是否跳帧。
+        timestamp_ns: u64,// 采集时刻，单位纳秒。
+        before_commit: F,// 图像发布前调用，用于提交配套数据（如位姿）。
     ) -> bool
     where
         F: FnOnce(&mut Self),
@@ -167,11 +168,11 @@ impl ShmPublisher {
     /// `position` 单位米、`quaternion` 为 `[w,x,y,z]`、`frame_seq`、`timestamp_ns`（纳秒）。
     pub fn publish_pose(
         &mut self,
-        index: PoseIndex,
-        position: [f32; 3],
-        quaternion: [f32; 4],
-        frame_seq: u64,
-        timestamp_ns: u64,
+        index: PoseIndex,   // 位姿索引，0..=Camera。
+        position: [f32; 3],// 位置姿，单位米。
+        quaternion: [f32; 4],// 四元数姿，单位无。
+        frame_seq: u64,     // 本帧递增序号，接收端用它判新旧、丢乱序。
+        timestamp_ns: u64,// 采集时刻，单位纳秒。
     ) {
         self.publish_pose_with_aux(
             index,
@@ -184,23 +185,25 @@ impl ShmPublisher {
     }
 
     /// 发布带辅助数据的位姿：aux 写进 `PoseMeta._pad`（16 字节，复用为数据通道）。
+    /// `position` 单位米、`quaternion` 为 `[w,x,y,z]`、`aux_f32` 为 4 个 float32 辅助数据、
+    /// `frame_seq`、`timestamp_ns`（纳秒）。
     pub fn publish_pose_with_aux(
         &mut self,
-        index: PoseIndex,
-        position: [f32; 3],
-        quaternion: [f32; 4],
-        aux_f32: [f32; 4],
-        frame_seq: u64,
-        timestamp_ns: u64,
+        index: PoseIndex,   // 位姿索引，0..=Camera。
+        position: [f32; 3],// 位置姿，单位米。
+        quaternion: [f32; 4],// 四元数姿，单位无。
+        aux_f32: [f32; 4],// 辅助数据，单位无。
+        frame_seq: u64,     // 本帧递增序号，接收端用它判新旧、丢乱序。
+        timestamp_ns: u64,// 采集时刻，单位纳秒。
     ) {
         unsafe {
             let meta = self.meta_region.as_mut::<ShmMetaRegion>();
             // `index as usize` 把 PoseIndex 当数组下标取对应位姿三缓冲。
             let pose_buf = &mut meta.poses[index as usize];
             let mut producer = TripleBufferProducer::new(
-                &pose_buf.state,
-                &mut pose_buf.write_idx,
-                &mut pose_buf.slots,
+                &pose_buf.state,// 位姿三缓冲状态，用于判断是否需要发布。
+                &mut pose_buf.write_idx,// 当前写入槽索引，用于循环写入。
+                &mut pose_buf.slots,// 位姿三缓冲槽，用于存储位姿数据。
             );
 
             let slot = producer.borrow_mut();
@@ -292,6 +295,7 @@ trait TripleBufferInit {
     fn init_state(&mut self);
 }
 
+/// 初始化图像三缓冲
 impl TripleBufferInit for ImageTripleBuffer {
     fn init_state(&mut self) {
         // state=1：就绪槽为 1 且无 FLAG_NEW；write_idx=0 可写；read_idx=2 已读。
@@ -301,6 +305,7 @@ impl TripleBufferInit for ImageTripleBuffer {
     }
 }
 
+/// 初始化位姿三缓冲
 impl TripleBufferInit for PoseTripleBuffer {
     fn init_state(&mut self) {
         self.state.store(1, Ordering::Relaxed);
@@ -309,6 +314,7 @@ impl TripleBufferInit for PoseTripleBuffer {
     }
 }
 
+/// 初始化云台三缓冲
 impl TripleBufferInit for GimbalTripleBuffer {
     fn init_state(&mut self) {
         self.state.store(1, Ordering::Relaxed);

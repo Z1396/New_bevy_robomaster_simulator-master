@@ -31,10 +31,15 @@ pub struct RoboMasterPlugins;
 impl Plugin for RoboMasterPlugins {
     fn build(&self, app: &mut App) {
         // 链式 `add_plugins` 依次安装各子系统插件；顺序一般无强依赖，这里按"基础设施在前"排列。
+            // `StatefulAppearancePlugin`：有状态外观插件（根据实体状态动态显示/隐藏组件）。
         app.add_plugins(StatefulAppearancePlugin)
+            // `ArmorPlugins`：装甲插件（处理装甲相关逻辑）。
             .add_plugins(ArmorPlugins)
+            // `PowerRunePlugins`：能量机关插件（处理能量机关相关逻辑）。
             .add_plugins(PowerRunePlugins)
+            // `OutpostPlugins`：前哨站插件（处理前哨站相关逻辑）。
             .add_plugins(OutpostPlugins)
+            // `TechCorePlugins`：科技核心插件（处理科技核心相关逻辑）。
             .add_plugins(TechCorePlugins);
     }
 }

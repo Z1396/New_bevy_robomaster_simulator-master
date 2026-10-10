@@ -154,9 +154,9 @@ impl Signal {
 /// 最多只有一个作业与一个结果在途，因为任务是一条单链的等待序列，同一时刻只可能卡在一件事上。
 #[derive(Default)]
 struct TaskChannel {
-    job: Mutex<Option<WorldJob>>,
+    job: Mutex<Option<WorldJob>>,//世界作业
     // 作业的返回值，类型已擦除；由任务侧 `downcast` 还原。
-    result: Mutex<Option<Box<dyn Any + Send>>>,
+    result: Mutex<Option<Box<dyn Any + Send>>>,//世界作业结果
 }
 
 /// Handle passed to an async task, granting deferred access to the world.
@@ -164,7 +164,7 @@ struct TaskChannel {
 #[derive(Clone)]
 pub struct AsyncWorld {
     // `Arc` 让任务持有的句柄能穿越 await 点/线程；`#[derive(Clone)]` 使句柄可复制多份。
-    channel: Arc<TaskChannel>,
+    channel: Arc<TaskChannel>,//任务通道
 }
 
 impl AsyncWorld {
@@ -319,9 +319,10 @@ pub struct AsyncWorldTask {
     // `Mutex` 只为满足 `Resource` 的 `Sync` 约束；驱动器始终独占访问，不存在真实争用。
     // `Pin<Box<dyn Future<...>>>`：把 Future 装箱并钉住地址——因为 await 生成的 Future 可能是
     // "自引用"的，一旦移动地址就悬空，`Pin` 从类型层面禁止移动。
-    future: Mutex<Pin<Box<dyn Future<Output = ()> + Send>>>,
-    waker: Arc<TaskWaker>,
-    channel: Arc<TaskChannel>,
+    future: Mutex<Pin<Box<dyn Future<Output = ()> + Send>>>,//任务 Future
+    // `Arc` 是原子引用计数器：多个线程可以安全地共享和修改任务的唤醒器。
+    waker: Arc<TaskWaker>,//任务唤醒器
+    channel: Arc<TaskChannel>,//任务通道
 }
 
 impl AsyncWorldTask {

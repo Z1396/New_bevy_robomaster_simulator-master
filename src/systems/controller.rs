@@ -161,11 +161,11 @@ impl ControllerInput {
 /// 其余字段是**跨帧保持**的开关/状态（如小陀螺开关、帮助文本、当前手柄）。
 #[derive(Resource, Debug, Default)]
 pub struct ControllerState {
-    pub controlled: ControllerInput,
-    pub remote: ControllerInput,
+    pub controlled: ControllerInput,     // 控制的输入快照（本帧）
+    pub remote: ControllerInput,         // 远程的输入快照（本帧）
     keyboard_auto_aim: bool,             // F5 切换的键盘自瞄开关
-    controlled_chassis_spin: ChassisSpinMode,
-    remote_chassis_spin: ChassisSpinMode,
+    controlled_chassis_spin: ChassisSpinMode, // 控制的底盘小陀螺开关
+    remote_chassis_spin: ChassisSpinMode, // 远程的底盘小陀螺开关
     active_gamepad: Option<Entity>,      // 最近活跃的手柄实体（震动回馈用）
     help: ControllerHelp,                // 当前帮助文本方案
 }
@@ -243,6 +243,8 @@ impl ControllerState {
 
 /// 帧首清空输入（Input 阶段第一个系统，见 main.rs）。
 pub fn clear_controller_input(mut controller: ResMut<ControllerState>) {
+    //reset_frame这个api意思是清空两个控制器输入快照（控制的和远程的），
+    // 保持跨帧状态字段（如小陀螺开关、帮助文本、当前手柄）不变
     controller.reset_frame();
 }
 
@@ -252,22 +254,30 @@ pub fn sample_keyboard_controller(
     mut controller: ResMut<ControllerState>,
 ) {
     // 有键盘动作就切到键盘帮助、清掉手柄焦点（表示当前用键盘操作）。
+    // keyboard_controller_active(&keyboard);创建22个按键的输入快照，返回bool值，true表示有键盘动作，false表示没有键盘动作
     let keyboard_used = keyboard_controller_active(&keyboard);
     if keyboard_used {
+        //use_help这个api意思是切换到键盘帮助文本(键盘帮助文本：W/A/S/D 移动，箭头键 云台，空格 射击，G 飞镖，Tab 切换，F3 切换相机，Q/U 切换小陀螺开关)
         controller.use_help(ControllerHelp::keyboard());
         controller.clear_gamepad();
     }
-    // Q/U 切换两台车的小陀螺开关（`just_pressed` 防连触）。
+    // Q/U 切换两台车的小陀螺开关（`just_pressed` 防连触）。按Q键切换控制的底盘小陀螺开关，
     if keyboard.just_pressed(KeyCode::KeyQ) {
+        // 如果是开启状态，切换到关闭状态；如果是关闭状态，切换到开启状态
         controller.toggle_controlled_chassis_spin();
     }
     if keyboard.just_pressed(KeyCode::KeyU) {
+        // 如果是开启状态，切换到关闭状态；如果是关闭状态，切换到开启状态按U键切换远程的底盘小陀螺开关，防止连按导致切换次数过多
         controller.toggle_remote_chassis_spin();
     }
-
-    // ---- 本机（controlled）----
+    // ---- 本机（controlled）----（on开启状态 == 1）
     let controlled_chassis_yaw = controller.controlled_chassis_spin.yaw_input();
     let controlled = &mut controller.controlled;
+    // add_movement这个api意思是添加键盘移动输入到控制的输入快照中，参数是W/A/S/D键的输入向量
+    // 每个元素表示对应方向的输入，范围是[-1.0, 1.0]
+    // 如果没有对应键，输入为0.0
+    // 最后返回3个轴的输入向量
+    // 0个轴表示前向移动，1个轴表示向左移动，2个轴表示向右移动
     controlled.add_movement(keyboard_vec2(
         &keyboard,
         KeyCode::KeyW,
@@ -275,16 +285,28 @@ pub fn sample_keyboard_controller(
         KeyCode::KeyS,
         KeyCode::KeyD,
     ));
+    // 同上，添加云台输入到控制的输入快照中，参数是箭头键的输入向量
     controlled.add_chassis(controlled_chassis_yaw, 0.0, 0.0);
+    // 同上，添加云台输入到控制的输入快照中，参数是箭头键的输入向量
+    // 每个元素表示对应方向的输入，范围是[-1.0, 1.0]
+    // 如果没有对应键，输入为0.0
+    // 最后返回2个轴的输入向量
+    // 0个轴表示云台偏航，1个轴表示云台俯仰
     controlled.add_gimbal(Vec2::new(
+        /*Bevy 底层读取操作系统原始键盘扫描码，封装成统一的`KeyCode`枚举：
+        - `KeyCode::ArrowLeft` = 键盘**左方向键**
+        - `KeyCode::ArrowRight` = 键盘**右方向键**
+        - `KeyCode::ArrowUp` = 键盘**上方向键**
+        - `KeyCode::ArrowDown` = 键盘**下方向键** */
         keyboard_axis(&keyboard, KeyCode::ArrowLeft, KeyCode::ArrowRight),
         keyboard_axis(&keyboard, KeyCode::ArrowUp, KeyCode::ArrowDown),
     ));
+
     controlled.boost |= keyboard.pressed(KeyCode::ShiftLeft); // `|=`：键盘或手柄任一为真即为真
-    controlled.shoot |= keyboard.pressed(KeyCode::Space);
-    controlled.dart_just_pressed |= keyboard.just_pressed(KeyCode::KeyG);
-    controlled.switch_slapper_just_pressed |= keyboard.just_pressed(KeyCode::Tab);
-    controlled.switch_camera_just_pressed |= keyboard.just_pressed(KeyCode::F3);
+    controlled.shoot |= keyboard.pressed(KeyCode::Space);       // 空格键射击
+    controlled.dart_just_pressed |= keyboard.just_pressed(KeyCode::KeyG); // G键飞镖
+    controlled.switch_slapper_just_pressed |= keyboard.just_pressed(KeyCode::Tab);  // Tab键切换小陀螺开关
+    controlled.switch_camera_just_pressed |= keyboard.just_pressed(KeyCode::F3); // F3键切换相机
 
     // ---- 遥控车（remote，IJKL 控制）----
     let remote_chassis_yaw = controller.remote_chassis_spin.yaw_input();
@@ -308,10 +330,12 @@ pub fn sample_keyboard_controller(
             0.0,
         ));
     }
+    // 同上，添加云台输入到控制的输入快照中，参数是F/V键的输入向量(按F键云台俯仰，按V键云台偏航)
     remote.add_gimbal(Vec2::new(
         0.0,
         keyboard_axis(&keyboard, KeyCode::KeyF, KeyCode::KeyV),
     ));
+    // ShiftRight键加速
     remote.boost |= keyboard.pressed(KeyCode::ShiftRight);
 
     // F5 切换键盘自瞄开关。
@@ -406,6 +430,8 @@ pub fn update_auto_aim_subscription(
 ) {
     let active = controller.auto_aim_active();
     // `swap` 返回旧值：只有状态真正变化时才打日志（避免每帧刷屏）。
+    // 语法解释：`swap(active, Ordering::AcqRel)`：原子交换 `enabled` 中的值为 `active`，并返回旧值
+    //  - `Ordering::AcqRel`：确保读取到的旧值是最新值（`Acquire`），并确保后续写入（`Release`）按顺序执行
     if enabled.swap(active, Ordering::AcqRel) != active {
         info!(
             "Auto-aim subscription is now {}.",
@@ -499,7 +525,7 @@ fn keyboard_axis(keyboard: &ButtonInput<KeyCode>, positive: KeyCode, negative: K
 fn keyboard_controller_active(keyboard: &ButtonInput<KeyCode>) -> bool {
     // 持续键：`pressed` 判定（按住即算使用）。
     const HELD_KEYS: [KeyCode; 22] = [
-        KeyCode::KeyW,
+        KeyCode::KeyW,   
         KeyCode::KeyA,
         KeyCode::KeyS,
         KeyCode::KeyD,
@@ -513,14 +539,14 @@ fn keyboard_controller_active(keyboard: &ButtonInput<KeyCode>) -> bool {
         KeyCode::KeyJ,
         KeyCode::KeyK,
         KeyCode::KeyL,
-        KeyCode::BracketLeft,
-        KeyCode::BracketRight,
-        KeyCode::Semicolon,
-        KeyCode::Quote,
-        KeyCode::KeyC,
-        KeyCode::KeyB,
-        KeyCode::KeyF,
-        KeyCode::KeyV,
+        KeyCode::BracketLeft, // [键
+        KeyCode::BracketRight,// ]键
+        KeyCode::Semicolon, // ;键
+        KeyCode::Quote, // '键
+        KeyCode::KeyC,  // C键
+        KeyCode::KeyB,  // B键
+        KeyCode::KeyF,  // F键
+        KeyCode::KeyV,  // V键
     ];
     // 触发键：`just_pressed` 判定（按下那一帧即算使用）。
     const EDGE_KEYS: [KeyCode; 6] = [

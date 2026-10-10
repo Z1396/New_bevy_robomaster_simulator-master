@@ -38,8 +38,11 @@ enum IpcMode {
 }
 
 /// 读环境变量 `TALOS_IPC` 决定运行时通道；只有恰好为 "shm" 才走共享内存，其余（含未设置）一律网络。
+// 就是说如果想改变默认的网络转发通道，只需要在环境变量中设置 "TALOS_IPC=shm" 即可。在终端中设置：
+// export TALOS_IPC=shm
 fn ipc_mode() -> IpcMode {
     // 三步串成一条链：`var` 读环境变量（Result，未设置时为 Err）→
+    // std::env::var("TALOS_IPC")表示读取环境变量 TALOS_IPC的值
     // `unwrap_or_default` 把 Err 变成空字符串 ""→ `to_ascii_lowercase` 统一小写 →
     // `as_str` 转成 &str 供 match 比较（match 的分支是字符串字面量）。
     match std::env::var("TALOS_IPC")
@@ -56,8 +59,8 @@ fn ipc_mode() -> IpcMode {
 /// 每个变体括住的类型不同（`Shm(ShmPublisher)` / `Net(NetIpcPublisher)`），
 /// 这就是"带数据的 enum 变体"——Rust 的 enum 不只是标签，还能各自携带任意载荷。
 pub enum TalosIpcPublisher {
-    Shm(ShmPublisher),
-    Net(NetIpcPublisher),
+    Shm(ShmPublisher), // 共享内存发布端
+    Net(NetIpcPublisher), // 网络发布端
 }
 
 /// 订阅端：共享内存订阅器或网络云台指令槽位。
@@ -65,9 +68,10 @@ pub enum TalosIpcPublisher {
 /// 这里直接持有该槽位的共享句柄（`Arc<Mutex<Option<...>>>`）——
 /// `Arc` 让多个线程共享同一块数据，`Mutex` 保证同一时刻只有一个线程能读写，
 /// `Option` 表示"还没收到过任何指令"。
+/// 订阅端：包装共享内存 / 网络两种实现，接口与原 `ShmSubscriber` 一致。
 pub enum TalosIpcSubscriber {
-    Shm(ShmSubscriber),
-    Net(Arc<Mutex<Option<GimbalCmd>>>),
+    Shm(ShmSubscriber), // 共享内存订阅端
+    Net(Arc<Mutex<Option<GimbalCmd>>>), // 网络云台指令槽位（跨线程共享 + 互斥访问）
 }
 
 impl TalosIpcSubscriber {
@@ -175,7 +179,9 @@ impl TalosIpcPublisher {
     /// 心跳保活：每帧调用，网络模式按阈值补发心跳包，供对端判断仿真是否存活。
     pub fn update_heartbeat(&mut self) {
         match self {
+            // 心跳保活：每帧调用，网络模式按阈值补发心跳包，供对端判断仿真是否存活。
             Self::Shm(publisher) => publisher.update_heartbeat(),
+            // 共享内存模式下不补发心跳包，仅用于同步握手。
             Self::Net(publisher) => publisher.update_heartbeat(),
         }
     }
@@ -219,8 +225,8 @@ impl TalosIpcPublisher {
 /// `subscriber` 用 `Option` 包着：共享内存下若对端还没建好则连接失败为 `None`，
 /// 此时只发不收（发布端照常工作）。
 pub struct TalosIpc {
-    pub publisher: TalosIpcPublisher,
-    pub subscriber: Option<TalosIpcSubscriber>,
+    pub publisher: TalosIpcPublisher,// 发布端
+    pub subscriber: Option<TalosIpcSubscriber>,// 订阅端
 }
 
 impl TalosIpc {
@@ -240,11 +246,17 @@ impl TalosIpc {
                 })
             }
             IpcMode::Net => {
-                // 读对端 IP：环境变量缺失时回退到 DEFAULT_REMOTE。
+                // 读对端 IP：环境变量缺失时回退到 DEFAULT_REMOTE。 
+                //unwrap_or_else(|_| DEFAULT_REMOTE.to_string())表示如果环境变量缺失，就用 DEFAULT_REMOTE 替代它则会连接到 DEFAULT_REMOTE:12345
+                // 例如：export TALOS_IPC_REMOTE=192.168.1.100
+                // 则会连接到 192.168.1.100:12345
                 let remote = std::env::var("TALOS_IPC_REMOTE")
                     .unwrap_or_else(|_| DEFAULT_REMOTE.to_string());
                 // `parse()` 返回 Result；`.map_err(|e| format!(...))?` 把解析错误
                 // 重包装成带上下文（原始值 + 原因）的字符串错误再向上传播（`?`）。
+                // IpAddr 表示 IP 地址，如 "192.168.1.100" 或 "192.168.1.100/32" 等。
+                // 例如：export TALOS_IPC_REMOTE=192.168.1.100
+                // 则会连接到 192.168.1.100:12345
                 let remote_ip: IpAddr = remote
                     .parse()
                     .map_err(|e| format!("invalid TALOS_IPC_REMOTE '{remote}': {e}"))?;
@@ -254,12 +266,14 @@ impl TalosIpc {
                     talos_ipc::net_ipc::NET_UDP_PORT,
                     talos_ipc::net_ipc::NET_TCP_PORT
                 );
+                // 网络发布端 = 连接到对端 IP
                 let publisher = NetIpcPublisher::connect(remote_ip)?;
                 // 网络订阅端 = 复用发布端内部的云台指令槽位句柄。
                 let subscriber = TalosIpcSubscriber::Net(publisher.gimbal_slot());
                 Ok(Self {
+                    // 网络发布端从 NetIpcPublisher::connect(remote_ip)? 连接到对端 IP:12345
                     publisher: TalosIpcPublisher::Net(publisher),
-                    subscriber: Some(subscriber),
+                    subscriber: Some(subscriber), //subscriber表示网络订阅端，用于接收云台指令和图像（TCP 数据）
                 })
             }
         }

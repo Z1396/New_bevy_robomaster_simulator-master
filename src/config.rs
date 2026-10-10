@@ -122,9 +122,9 @@ pub struct RenderConfig {
 impl Default for RenderConfig {
     fn default() -> Self {
         Self {
-            illuminance: 50.0,
-            shadows: false,
-            main_camera_fxaa: false,
+            illuminance: 50.0, // 主平行光的照度，单位：勒克斯（lux）
+            shadows: false,   // 阴影渲染开关，阴影显存开销巨大，战车场景容易爆显存，这里关闭
+            main_camera_fxaa: false,  // 主预览相机FXAA快速抗锯齿，画面边缘减少锯齿，开销低
             // `cfg!(...)`：编译期判断目标系统，macOS 上默认开启 MetalFX 时域升采样。
             metalfx_temporal: cfg!(target_os = "macos"),
             metalfx_frame_generation: false,
@@ -501,15 +501,19 @@ impl Plugin for ConfigPlugin {
         // Set up file watcher using crossbeam-channel for thread safety
         // 用 crossbeam 通道搭建文件监听器，保证跨线程安全（监听线程 send，主线程 recv）。
         let (tx, rx): (
-            Sender<Result<Event, notify::Error>>,
-            Receiver<Result<Event, notify::Error>>,
-        ) = unbounded();
+            // `Sender` 是发送端，`Receiver` 是接收端。
+            // `Result` 是为了处理可能的错误（如文件不存在）。
+            Sender<Result<Event, notify::Error>>,//事件发送端
+            // 监听器把事件塞进通道，主线程从通道取。
+            // 监听器在后台线程执行，主线程在主线程执行。
+            Receiver<Result<Event, notify::Error>>,//事件接收端
+        ) = unbounded(); // 创建一个无界通道：可以无限发送事件，不会阻塞接收端。
         let watcher_result = RecommendedWatcher::new(
             // 监听回调在后台线程执行：把事件塞进通道即可，不直接碰世界数据。
             move |res| {
-                let _ = tx.send(res);
+                let _ = tx.send(res);//
             },
-            notify::Config::default(),
+            notify::Config::default(),//默认配置
         );
 
         // `match` 处理创建监听器的成功/失败。

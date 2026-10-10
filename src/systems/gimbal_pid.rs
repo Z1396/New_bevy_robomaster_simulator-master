@@ -144,6 +144,7 @@ pub fn gimbal_pid_controls(
     time: Res<Time>,
     config: Res<SimulationConfig>,
     // `Option<Single<...>>`：tracker 可能不存在（无目标）——那就整体跳过，不报错。
+    // (With<Controlled>, Without<InfantryChassis>) 表示只作用于被 Tab 选中的 AI 车的云台
     gimbal: Option<
         Single<
             (
@@ -160,9 +161,11 @@ pub fn gimbal_pid_controls(
         >,
     >,
     // 炮口节点：误差在它身上量取（见 tracking_error 说明）。
+    // (With<InfantryLaunchOffset>, With<Controlled>) 表示只作用于被 Tab 选中的 AI 车的炮口
     muzzle: Option<Single<&GlobalTransform, (With<InfantryLaunchOffset>, With<Controlled>)>>,
 ) {
     // 两者缺一都不做自瞄（`let ... else` 提前返回）。
+    // 从云台中获取变换、组件
     let (Some(gimbal), Some(muzzle)) = (gimbal, muzzle) else {
         return;
     };
@@ -170,33 +173,39 @@ pub fn gimbal_pid_controls(
     if dt <= 0.0 {
         return; // dt 为 0 会让微分项除零
     }
-
+    // 从炮口中获取全局变换、组件还有固定安装偏移
     let (mut gimbal_transform, gimbal_global, mut gimbal_data, mut tracker) = gimbal.into_inner();
 
-    // Error is measured on the muzzle, so chassis motion shows up as tracking error
-    // instead of being cancelled out by a one-shot correction.
     // 中文：误差在炮口上量取，于是底盘转动会真实地体现为追踪误差，而不会被"一次性修正"抹平。
+    // 参数单位：速度均为 弧度/秒，加速度 弧度/秒²，dt 为秒。
+    // 误差 = 期望角 - 当前角，各自取最短绕行。
     let error = tracking_error(
-        tracker.target().rotation(),
-        gimbal_transform.rotation,
-        gimbal_global.rotation(),
-        muzzle.rotation(),
+        tracker.target().rotation(),    // 什么目标旋转，即炮口世界体系下的目标旋转
+        gimbal_transform.rotation,    // 云台本体系旋转
+        gimbal_global.rotation(),    // 云台世界体系旋转
+        muzzle.rotation(),    // 炮口世界体系旋转
     );
+    // 中文：解算云台本体系下的 (yaw, pitch) 追踪误差。
     let (yaw_error, pitch_error) = (error.x, error.y);
+    // 根据云台本体下的误差，计算云台本体下的角速度指令（弧度/秒）。
     let pid = &config.vehicle.gimbal_pid;
     // 两轴各自过 PID，得到本帧的角速度指令（弧度/秒）。
     let yaw_rate = tracker.yaw.step(yaw_error, &pid.yaw, dt);
+    // 根据云台本体下的误差，计算云台本体下的 pitch 角速度指令（弧度/秒）。
     let pitch_rate = tracker.pitch.step(pitch_error, &pid.pitch, dt);
 
     // 把角速度指令积分回姿态角（先反向同步当前欧拉角，再累加）。
     (gimbal_data.local_yaw, gimbal_data.pitch, _) =
-        gimbal_transform.rotation.to_euler(EulerRot::YXZ);
-    gimbal_data.local_yaw += yaw_rate * dt;
-    gimbal_data.pitch = (gimbal_data.pitch + pitch_rate * dt).clamp(
-        -config.vehicle.gimbal_pitch_limit,
-        config.vehicle.gimbal_pitch_limit,
+        gimbal_transform.rotation.to_euler(EulerRot::YXZ);  // 云台本体系下的 yaw, pitch
+        gimbal_data.local_yaw += yaw_rate * dt;  // 累加 yaw 角度
+        // 累加 pitch 角度，限制在 [-pitch_limit, pitch_limit] 范围内
+        gimbal_data.pitch = (gimbal_data.pitch + pitch_rate * dt).clamp(
+            -config.vehicle.gimbal_pitch_limit,
+            config.vehicle.gimbal_pitch_limit,
     );
 
+    // 中文：把角速度指令积分回姿态角（先反向同步当前欧拉角，再累加）。
+    // 参数单位：速度均为 弧度/秒，dt 为秒。
     gimbal_transform.rotation =
         Quat::from_euler(EulerRot::YXZ, gimbal_data.local_yaw, gimbal_data.pitch, 0.0);
 }

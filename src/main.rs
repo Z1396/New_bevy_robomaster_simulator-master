@@ -48,6 +48,7 @@ use bevy_inspector_egui::bevy_egui::EguiPlugin; // 调试 UI 框架
 use bevy_inspector_egui::quick::WorldInspectorPlugin; // 运行时实体/组件检视器
 use std::sync::atomic::AtomicBool; // 原子布尔：跨线程安全读写而不加锁
 
+// 引入项目里的组件、插件、系统等。
 use crate::components::{CameraMode, FollowingType, ProjectileCooldown, SubscribeAutoAim};
 use crate::config::{ConfigPlugin, SimulationConfig};
 use crate::handler::{on_activate, on_hit};
@@ -132,6 +133,8 @@ fn render_plugin_for_platform() -> RenderPlugin {
 /// `Time<Fixed>` 是泛型时钟——物理相关系统（FixedUpdate）按这个固定节拍执行，
 /// 与渲染帧率解耦（帧率波动不影响物理稳定性）。
 fn fixed_time_from_config(config: &SimulationConfig) -> Time<Fixed> {
+    // 从配置里取固定时间步长（Hz），并确保不为 0。用来控制物理引擎的更新频率。
+    // 除零会导致物理引擎崩溃，所以这里取最大值 1.0。
     Time::<Fixed>::from_hz(config.physics.fixed_hz.max(1.0))
 }
 
@@ -156,7 +159,7 @@ fn should_enable_talos_plugin(_app: &App) -> bool {
 fn main() {
     // `App` 是 Bevy 应用的容器：所有插件、资源、系统都注册到它身上，最后 run() 启动主循环。
     let config = SimulationConfig::default();
-    // `unwrap_or_else(|...| ...)`：Option 是 None 时用闭包的返回值兜底（这里先打警告日志）；
+    // `unwrap_or_else(|...| ...)`：Option 是 None 时用闭包(相当于C++的lambda)的返回值兜底（这里先打警告日志）；
     // 与 unwrap() 的区别是不会 panic。
     let present_mode = present_mode_from_config(&config.window.present_mode).unwrap_or_else(|| {
         warn!(
@@ -166,11 +169,13 @@ fn main() {
         PresentMode::AutoNoVsync
     });
     let mut app = App::new();
-    // `DefaultPlugins` 是 Bevy 的"全家桶"：窗口、渲染、输入、资源加载、UI 等一切基础能力；
-    // `.set(...)` 用来覆盖其中某个插件的默认配置。`PhysicsPlugins` 是 avian3d 物理引擎。
+    //添加插件(默认插件集，物理引擎插件)
     app.add_plugins((
+        // `DefaultPlugins` 是 Bevy 的"全家桶"：窗口、渲染、输入、资源加载、UI 等一切基础能力；
         DefaultPlugins
-            .set(WindowPlugin {
+            // `WindowPlugin`：窗口插件（创建窗口、处理窗口事件）。
+            .set(WindowPlugin {// `.set(...)` 用来覆盖其中某个插件的默认配置。`PhysicsPlugins` 是 avian3d 物理引擎。
+                // `primary_window`：主窗口（显示画面、处理用户输入）。
                 primary_window: Some(Window {
                     present_mode,
                     // `fit_canvas_to_parent`：Web 构建时画布填满父元素（本地运行无影响）
@@ -179,16 +184,24 @@ fn main() {
                 }),
                 ..default()
             })
+            //render_plugin_for_platform()表示根据平台选择渲染插件配置（WSL 里的 wgpu 常常拿不到"合规"的 GPU 适配器，
+            // 这里放宽校验（ALLOW_UNDERLYING_NONCOMPLIANT_ADAPTER）让仿真能在 WSL 下跑起来；Windows/macOS 原生环境直接用默认配置。）
             .set(render_plugin_for_platform()),
+        // `PhysicsPlugins`：物理引擎插件（提供碰撞检测、力模拟等）。
+        // 这里用 avian3d 物理引擎，也可以用其他物理引擎（如 bullet）。
         PhysicsPlugins::default(),
     ));
     // 连续渲染模式：每帧都重绘（默认 winit 是"无变化不重绘"的省电模式，
     // 对游戏不合适——相机在动、物理在跑，帧帧都有变化）。
+    // insert_resource()：插入全局资源（类型必须实现 Default）。
+    // WinitSettings::continuous()：开启连续渲染模式（默认是"无变化不重绘"的省电模式）。
     app.insert_resource(WinitSettings::continuous());
-
+    //添加插件(egui插件，世界检查器插件)
     if config.debug.egui {
+        // `EguiPlugin`：egui 插件（提供 egui 界面）。
         app.add_plugins(EguiPlugin::default());
         if config.debug.inspector {
+            // `WorldInspectorPlugin`：世界检查器插件（显示场景中的所有实体、组件、系统等）。
             app.add_plugins(WorldInspectorPlugin::new());
         }
     }
@@ -197,30 +210,31 @@ fn main() {
     // `add_plugins`：插件 = 一组"注册资源+系统"的打包单元，Bevy 的一切功能都来自插件。
     // `RoboMasterPlugins` 是本项目 robomaster/ 模块的自定义插件包（车辆/装甲/能量机关）。
     app.add_plugins(RoboMasterPlugins)
-        .add_plugins(MetalFxPlugin)
-        .add_plugins(crate::scene::ScenePlugin)
-        .add_plugins(ConfigPlugin)
+        .add_plugins(MetalFxPlugin)//金属特效插件
+        .add_plugins(crate::scene::ScenePlugin)//场景插件
+        .add_plugins(ConfigPlugin)//配置插件
         // `init_resource`：用 Default::default() 创建全局资源（类型必须实现 Default）；
         // 与 `insert_resource`（直接给值）的区别只是"谁来提供初始值"。
-        .init_resource::<CameraMode>()
-        .init_resource::<ProjectileStatistics>()
-        .init_resource::<ChassisObservationFrame>()
-        .init_resource::<PreviousKinematicState>()
-        .init_resource::<ControllerState>()
+        //insert_resource 是在启动时初始化一次一定要给初始值，而 init_resource 是在每帧都初始化一次可以不给初始值。
+        .init_resource::<CameraMode>()//相机模式资源
+        .init_resource::<ProjectileStatistics>()//子弹统计资源
+        .init_resource::<ChassisObservationFrame>()//战车观测帧资源
+        .init_resource::<PreviousKinematicState>()//上一帧运动状态资源
+        .init_resource::<ControllerState>()//控制器状态资源
         // `register_type`：注册反射信息，让 egui 检视器/序列化能在运行时枚举字段。
-        .register_type::<ProjectileStatistics>()
+        .register_type::<ProjectileStatistics>()//子弹统计资源
         // 以下都是 avian 物理引擎的全局设置：重力方向、子步数（每物理步内细分求解次数，
         // 越大越稳定越费 CPU）、固定物理步长（120Hz，与渲染帧率解耦）。
-        .insert_resource(Gravity(Vec3::NEG_Y * 9.81))
-        .insert_resource(SubstepCount(config.physics.substep_count))
-        .insert_resource(fixed_time_from_config(&config))
+        .insert_resource(Gravity(Vec3::NEG_Y * 9.81))//重力方向
+        .insert_resource(SubstepCount(config.physics.substep_count))//子步数
+        .insert_resource(fixed_time_from_config(&config))//固定物理步长
         // AtomicBool 原子布尔：多线程安全的开关（自瞄订阅开关，talos/ROS2 线程也会读写）。
-        .insert_resource(SubscribeAutoAim(AtomicBool::new(false)))
+        .insert_resource(SubscribeAutoAim(AtomicBool::new(false)))//自瞄订阅开关
         .insert_resource(ProjectileCooldown(Timer::from_seconds(
             config.projectile.cooldown,
             TimerMode::Once,
-        )))
-        // `Startup` 系统只在启动时执行一次（创建相机、灯光、子弹材质等一次性初始化）。
+        )))//子弹冷却时间
+        // `Startup` 系统只在启动时执行一次（创建相机、灯光、子弹材质、飞镖资产等一次性初始化）。
         .add_systems(Startup, (setup, setup_projectile))
         // `add_observer`：注册观察者——不进每帧调度表，而是"事件发生时被调用"的回调。
         // on_hit/on_activate 响应能量机关的命中/激活事件。
@@ -237,7 +251,7 @@ fn main() {
                 GameplaySystems::Camera,
                 GameplaySystems::Cleanup,
             )
-                .chain(),
+            .chain(),
         )
         .add_systems(
             Update,
@@ -252,6 +266,7 @@ fn main() {
                     clear_controller_input,
                     // 从键盘/手柄采样原始输入，汇总进全局 ControllerState 资源
                     sample_keyboard_controller,
+                    // 从手柄采样原始输入，汇总进全局 ControllerState 资源
                     sample_gamepad_controller,
                     // 自瞄订阅开关状态同步（talos/ROS2 是否要接收相机数据）
                     update_auto_aim_subscription,
@@ -273,24 +288,35 @@ fn main() {
                     // 远程云台指令（非自瞄回路）
                     remote_gimbal_controls,
                 )
-                    .chain()
-                    .in_set(GameplaySystems::Input),
+                .chain()
+                .in_set(GameplaySystems::Input),
+
+
                 // GameLogic phase
                 // 【修改】新增 spin_display_vehicle：展示战车闲置自转（提交 b120db1）。
                 // 放在 GameLogic（晚于 Input 阶段）：Tab 选中时 Input 阶段插入的
                 // ActiveSlapper 在本阶段前生效，自转系统同帧失配实现"瞬停"。
                 // 另两个：C/B 键换装甲贴纸样式、刷新左下角状态栏文字
-                (spin_display_vehicle, change_appearance, update_help_text)
-                    .in_set(GameplaySystems::GameLogic),
+                (
+                    spin_display_vehicle, // 战车闲置自转
+                    change_appearance, // 装甲贴纸样式切换
+                    update_help_text // 刷新状态栏文字
+                )
+                .in_set(GameplaySystems::GameLogic),
+
+
                 // Camera phase —— 相机在游戏逻辑算完后才跟随，保证跟的是本帧结果
                 (
-                    freecam_controls.run_if(|mode: Res<CameraMode>| mode.0 == FollowingType::Free),
+                    freecam_controls.run_if(|mode: Res<CameraMode>| mode.0 == FollowingType::Free), // 自由相机模式
+                    // 第一人称/第三人称相机模式
                     systems::update_camera_follow
                         .run_if(|mode: Res<CameraMode>| mode.0 != FollowingType::Free),
                 )
                 .in_set(GameplaySystems::Camera)
                 // 再早于渲染阶段，确保渲染用的是移动后的相机。
                 .before(RenderSystems::Render),
+
+
                 // Cleanup phase —— 帧末清理：到期子弹销毁、F2 截图等
                 (
                     // 巡检所有子弹的寿命计时器，到期的 despawn（销毁实体）
@@ -309,21 +335,24 @@ fn main() {
         // 累积计算完（世界矩阵更新），才能拿到炮口的最新世界位置/朝向，否则会
         // 用上一帧的旧位置生成子弹。
         .add_systems(
-            PostUpdate,
+            PostUpdate, // 渲染前的收尾阶段
+            // 更新战车位姿（包括云台）
+            // 必须在渲染前，确保渲染用的是最新位姿。TransformSystems::Propagate表示等待所有变换更新完成。
             update_chassis_observation.after(TransformSystems::Propagate),
         )
         .add_systems(
             PostUpdate,
             projectile_launch
                 .after(TransformSystems::Propagate)
-                .run_if(controller_shoot_pressed),
+                .run_if(controller_shoot_pressed),// run_if：只在按下射击键时发射子弹
         )
         .add_systems(
             PostUpdate,
             dart_launch
                 .after(TransformSystems::Propagate)
-                .run_if(controller_dart_just_pressed),
+                .run_if(controller_dart_just_pressed),// run_if：只在按下飞镖键时发射飞镖
         )
+        // 无人机检测模块：UAV_LAUNCH_DIRECTION（默认 p 键）
         .add_systems(PostUpdate, uav_launch.after(TransformSystems::Propagate))
         // FixedUpdate：固定频率调度（默认随物理 120Hz），空气阻力按固定步长计算更稳定。
         .add_systems(FixedUpdate, projectile_aerodynamics);
@@ -350,6 +379,7 @@ fn main() {
 
     #[cfg(feature = "talos")]
     {
+        // should_enable_talos_plugin：根据环境变量判断是否启用 talos 插件。
         if should_enable_talos_plugin(&app) {
             app.add_plugins(TalosPlugin::default());
             info!("talos integration enabled");

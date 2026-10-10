@@ -81,7 +81,9 @@ fn ros_yaw(global_tf: &GlobalTransform) -> f32 {
 
 /// 每帧收集全体战车/能量机关的真值，打包成一批后发布（在 `Last` 阶段运行）。
 pub fn publish_ground_truth_system(
+    // 捕获上下文
     context: Option<Res<TalosCaptureContext>>,
+    // 当前帧戳
     frame_stamp: Res<TalosFrameStamp>,
     // 敌方战车：不带 Controlled（不带 = 非本机操控）。
     infantry_query: Query<

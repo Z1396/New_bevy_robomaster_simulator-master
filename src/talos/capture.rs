@@ -94,9 +94,13 @@ fn now_ns() -> u64 {
 
 // 捕获管线要求的两段式回调的一环：先在主世界（快照时刻）构造这个"同步快照"，
 // 它再被交给渲染线程，待 GPU 回读完成时转成 `SnapshotAsync` 真正执行发送。
+/// 同步快照：包含一帧内的位姿数据（**均已转到 ROS 坐标系**）。
 struct TalosSnapshotSync {
+    /// 单调递增帧序号（从 0 开始），接收端用它判新旧/丢乱序。
     frame_seq: u64,
+    /// 采集时刻，单位 **纳秒**（Unix 纪元至今）。
     timestamp_ns: u64,
+    /// 一帧内一次性抓取的位姿集合（**均已转到 ROS 坐标系**）。 
     pose: CapturedPoseData,
 }
 
@@ -121,13 +125,15 @@ impl SnapshotSync for TalosSnapshotSync {
     }
 }
 
+/// 异步快照：包含一帧内的图像 + 位姿数据（**均已转到 ROS 坐标系**）。
 struct TalosSnapshot {
-    ctx: Arc<Mutex<TalosIpcPublisher>>,
-    frame_seq: u64,
-    timestamp_ns: u64,
-    pose: CapturedPoseData,
+    ctx: Arc<Mutex<TalosIpcPublisher>>,// 发布端句柄，用于发布图像 + 位姿。
+    frame_seq: u64,// 本帧递增序号，接收端用它判新旧、丢乱序。
+    timestamp_ns: u64,// 采集时刻，单位纳秒。
+    pose: CapturedPoseData,// 一帧内一次性抓取的位姿集合（**均已转到 ROS 坐标系**）。 
 }
 
+/// 实现异步快照的 `SnapshotAsync` 接口
 impl SnapshotAsync for TalosSnapshot {
     // `CapturedFrame<'_>` 带生命周期的借用：`frame.data` 是渲染回读缓冲的切片，
     // 只在本次回调内有效，故不复制、直接发（零拷贝）。
@@ -176,6 +182,7 @@ impl SnapshotAsync for TalosSnapshot {
 #[derive(Default)]
 struct TalosSnapshotCreator {}
 
+/// 实现 GPU 捕获处理回调
 impl GpuCaptureHandler for TalosSnapshotCreator {
     // `&World` 只读访问世界（此处即主世界）；返回 `Option` 表示"这帧有没有可发的位姿"。
     fn captured(
@@ -196,9 +203,9 @@ impl GpuCaptureHandler for TalosSnapshotCreator {
 
         // 打包成同步快照交给渲染线程（真正的发送发生在 GPU 回读完成后）。
         Some(Box::new(TalosSnapshotSync {
-            frame_seq: extracted.frame_seq,
-            timestamp_ns: extracted.timestamp_ns,
-            pose,
+            frame_seq: extracted.frame_seq, // 本帧递增序号，接收端用它判新旧、丢乱序。
+            timestamp_ns: extracted.timestamp_ns, // 采集时刻，单位纳秒。
+            pose, // 一帧内一次性抓取的位姿集合（**均已转到 ROS 坐标系**）。
         }))
     }
 }
@@ -212,26 +219,31 @@ pub struct TalosCaptureContextShared(pub Arc<Mutex<TalosIpcPublisher>>);
 /// 捕获上下文资源：跨系统共享的发布端句柄 + 相机视场角（fov_y，单位**弧度**）。
 #[derive(Resource, Clone)]
 pub struct TalosCaptureContext {
-    pub publisher: Arc<Mutex<TalosIpcPublisher>>,
-    pub fov_y: f32,
+    pub publisher: Arc<Mutex<TalosIpcPublisher>>,// 网络发布端句柄，用于发送图像/位姿。
+    pub fov_y: f32, //fov_y 视场角（弧度）
 }
 
 /// 捕获插件：把通用捕获管线（`CaptureBundle`）接上 Talos 的回调与调度。
 pub struct TalosCapturePlugin {
-    pub config: CaptureConfig,
-    pub context: TalosCaptureContext,
+    pub config: CaptureConfig,// 捕获配置
+       pub context: TalosCaptureContext,// 捕获上下文
 }
 
 /// 把"自瞄订阅开关"作为运行状态发给对端（告知视觉程序当前是否在接收其指令）。
 pub fn publish_talos_runtime_state_system(
+    // 捕获上下文
     context: Option<Res<TalosCaptureContext>>,
-    frame_stamp: Res<TalosFrameStamp>,
+    // 当前帧戳
+    frame_stamp: Res<TalosFrameStamp>,//
+    // 自瞄订阅开关
     following: Res<SubscribeAutoAim>,
 ) {
     let Some(ctx) = context else {
         return;
     };
-
+    // 发布运行状态。
+    // `RuntimeState`：包含时间戳、自瞄订阅开关（0/1）。
+    // `publish_runtime_state`：将运行状态发送给对端，单位 ns。
     if let Ok(mut publisher) = ctx.publisher.lock() {
         publisher.publish_runtime_state(RuntimeState {
             timestamp_ns: frame_stamp.timestamp_ns,

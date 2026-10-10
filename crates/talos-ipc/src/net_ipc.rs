@@ -27,22 +27,22 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 // 协议常量与包头
 // ---------------------------------------------------------------------------
 
-pub const NET_MAGIC: u32 = 0x5441_4C06;
-pub const NET_VERSION: u16 = 1;
-pub const NET_UDP_PORT: u16 = 9571;
-pub const NET_TCP_PORT: u16 = 9572;
+pub const NET_MAGIC: u32 = 0x5441_4C06; // 协议魔数，固定值 `0x5441_4C06`。
+pub const NET_VERSION: u16 = 1; // 协议版本，固定值 `1`。
+pub const NET_UDP_PORT: u16 = 9571; // UDP 端口，固定值 `9571`。
+pub const NET_TCP_PORT: u16 = 9572; // TCP 端口，固定值 `9572`。
 
 // `pkt_type` 取值：接收端据此判断载荷是哪种结构体（1..=6 走 UDP，7 为对端回传的云台指令，8 走 TCP 图像）。
-pub const PKT_TYPE_POSE: u8 = 1;
-pub const PKT_TYPE_CHASSIS_OBSERVATION: u8 = 2;
-pub const PKT_TYPE_GROUND_TRUTH: u8 = 3;
-pub const PKT_TYPE_CAMERA_INFO: u8 = 4;
-pub const PKT_TYPE_RUNTIME_STATE: u8 = 5;
-pub const PKT_TYPE_HEARTBEAT: u8 = 6;
-pub const PKT_TYPE_GIMBAL_CMD: u8 = 7;
-pub const PKT_TYPE_IMAGE: u8 = 8;
+pub const PKT_TYPE_POSE: u8 = 1; // 位姿，固定值 `1`。
+pub const PKT_TYPE_CHASSIS_OBSERVATION: u8 = 2; // 底盘观测，固定值 `2`。
+pub const PKT_TYPE_GROUND_TRUTH: u8 = 3; // 真值，固定值 `3`。
+pub const PKT_TYPE_CAMERA_INFO: u8 = 4; // 相机参数，固定值 `4`。
+pub const PKT_TYPE_RUNTIME_STATE: u8 = 5; // 运行状态，固定值 `5`。
+pub const PKT_TYPE_HEARTBEAT: u8 = 6; // 心跳，固定值 `6`。
+pub const PKT_TYPE_GIMBAL_CMD: u8 = 7; // 云台指令，固定值 `7`。
+pub const PKT_TYPE_IMAGE: u8 = 8; // 图像，固定值 `8`。
 
-/// 心跳触发阈值：距上次任意发包超过该时长就补发心跳包（保证 ≥10Hz 保活）。
+/// 心跳触发阈值：距上次任意发包超过该时长就补发心跳包（保证 ≥10Hz 保活）单位毫秒。
 const HEARTBEAT_INTERVAL: Duration = Duration::from_millis(100);
 /// TCP 断线重连间隔。
 const TCP_RECONNECT_DELAY: Duration = Duration::from_millis(500);
@@ -54,17 +54,19 @@ const JPEG_QUALITY: u8 = 75;
 /// UDP 通用 32 字节包头。
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
+/// `PacketHeader`：UDP 包头，包含魔数、版本、有效载荷长度、包类型、索引、填充、序号、时间戳。
 pub struct PacketHeader {
-    pub magic: u32,
-    pub version: u16,
-    pub payload_len: u16,
-    pub pkt_type: u8,
-    pub index: u8,
-    pub _pad: u16,
-    pub _pad2: u32,
-    pub seq: u64,
-    pub timestamp_ns: u64,
+    pub magic: u32,// `magic`：协议魔数，固定值 `0x5441_4C06`。
+    pub version: u16,// `version`：协议版本，固定值 `1`。
+    pub payload_len: u16,// `payload_len`：有效载荷长度，单位字节。
+    pub pkt_type: u8,// `pkt_type`：包类型，固定值 `1..=8`。
+    pub index: u8,// `index`：包索引，固定值 `0`。
+    pub _pad: u16,// `pad`：填充，固定值 `0`。
+    pub _pad2: u32,// `pad2`：填充，固定值 `0`。
+    pub seq: u64,// `seq`：序号，递增。
+    pub timestamp_ns: u64,// `timestamp_ns`：时间戳，单位纳秒。
 }
+// `PacketHeader` 字段偏移量，确保布局正确。
 const _: () = assert!(size_of::<PacketHeader>() == 32);
 const _: () = assert!(std::mem::offset_of!(PacketHeader, version) == 4);
 const _: () = assert!(std::mem::offset_of!(PacketHeader, payload_len) == 6);
@@ -79,16 +81,17 @@ const _: () = assert!(std::mem::offset_of!(PacketHeader, timestamp_ns) == 24);
 /// 重连循环——这是第一版联网调试时定位到的关键 bug，勿改字段顺序。
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
+/// `ImageFrameHeader`：TCP 图像帧包头，包含魔数、包类型、填充、图像宽高、JPEG 长度、填充、序号、时间戳。
 pub struct ImageFrameHeader {
-    pub magic: u32,
-    pub pkt_type: u8,
-    pub _pad: [u8; 3],
-    pub width: u32,
-    pub height: u32,
-    pub jpeg_len: u32,
-    pub _pad2: u32,
-    pub seq: u64,
-    pub timestamp_ns: u64,
+    pub magic: u32,// `magic`：协议魔数，固定值 `0x5441_4C06`。
+    pub pkt_type: u8,// `pkt_type`：包类型，固定值 `8`。
+    pub _pad: [u8; 3],// `pad`：填充，固定值 `0`。
+    pub width: u32,// `width`：图像宽度，单位像素。
+    pub height: u32,// `height`：图像高度，单位像素。
+    pub jpeg_len: u32,// `jpeg_len`：JPEG 字节长度，单位字节。
+    pub _pad2: u32,// `pad2`：填充，固定值 `0`。
+    pub seq: u64,// `seq`：序号，递增。
+    pub timestamp_ns: u64,// `timestamp_ns`：时间戳，单位纳秒。
 }
 const _: () = assert!(size_of::<ImageFrameHeader>() == 40);
 const _: () = assert!(std::mem::offset_of!(ImageFrameHeader, pkt_type) == 4);
@@ -118,29 +121,34 @@ fn bytes_of<T: Copy>(value: &T) -> &[u8] {
 
 /// 一帧待编码的原始图像（RGB8）+ 元数据；`data` 长度 = width×height×3 字节。
 struct RawImageFrame {
-    data: Vec<u8>,
-    width: u32,
-    height: u32,
-    seq: u64,
-    timestamp_ns: u64,
+    data: Vec<u8>,// `data`：图像数据，RGB8 格式，单位字节。
+    width: u32,// `width`：图像宽度，单位像素。
+    height: u32,// `height`：图像高度，单位像素。
+    seq: u64,// `seq`：序号，递增。
+    timestamp_ns: u64,// `timestamp_ns`：时间戳，单位纳秒。
 }
 
 /// "最新一帧"槽位：渲染线程调用 `publish` 覆盖式写入，TCP 线程调用 `take` 阻塞取走。
 /// 只保留最新一帧（旧帧被直接丢弃），因此渲染端永远不会因网络慢而阻塞。
 /// `Mutex` 保护数据，`Condvar`（条件变量）让 `take` 在无帧时睡眠、有帧时被唤醒，避免忙等。
 struct ImageSlot {
-    frame: Mutex<Option<RawImageFrame>>,
-    signal: Condvar,
+    frame: Mutex<Option<RawImageFrame>>,// `frame`：最新一帧，或 `None`。
+    signal: Condvar,// `signal`：条件变量，用于唤醒 `take` 等待的线程。
 }
 
+// `ImageSlot` 实现
 impl ImageSlot {
     fn new() -> Self {
         Self {
-            frame: Mutex::new(None),
-            signal: Condvar::new(),
+            frame: Mutex::new(None),// `frame`：最新一帧，或 `None`。
+            signal: Condvar::new(),// `signal`：条件变量，用于唤醒 `take` 等待的线程。
         }
     }
-
+    /// 发布一帧图像（RGB8）+元数据；`data` 长度 = width×height×3 字节。
+    /// - `width`：图像宽度，单位像素。
+    /// - `height`：图像高度，单位像素。
+    /// - `seq`：序号，递增。
+    /// - `timestamp_ns`：时间戳，单位纳秒。
     fn publish(&self, data: &[u8], width: u32, height: u32, seq: u64, timestamp_ns: u64) {
         let mut guard = self.frame.lock().unwrap();
         // 复用被替换帧的缓冲容量：每帧 1440x1080x3 ≈ 4.6MB，若每次都新分配，
@@ -149,12 +157,13 @@ impl ImageSlot {
         let mut buffer = guard.take().map(|f| f.data).unwrap_or_default();
         buffer.clear();
         buffer.extend_from_slice(data);
+        // 用新帧替换旧帧（`drop(guard)` 时自动解锁）
         *guard = Some(RawImageFrame {
-            data: buffer,
-            width,
-            height,
-            seq,
-            timestamp_ns,
+            data: buffer,// `data`：图像数据，RGB8 格式，单位字节。
+            width,// `width`：图像宽度，单位像素。
+            height,// `height`：图像高度，单位像素。
+            seq,// `seq`：序号，递增。
+            timestamp_ns,// `timestamp_ns`：时间戳，单位纳秒。
         });
         // 唤醒一个正在 `take` 中等待的消费者线程。
         self.signal.notify_one();
@@ -194,52 +203,66 @@ pub struct NetIpcPublisher {
 
 impl NetIpcPublisher {
     /// 绑定系统分配的 UDP 端口，启动 UDP 接收线程与 TCP 图像线程。
-    pub fn connect(remote_ip: IpAddr) -> std::io::Result<Self> {
+    /// Ipaddr 是对端 NUC 的 IP 地址，如 "192.168.1.100" 或 "192.168.1.100/32" 等。
+    pub fn connect(remote_ip: IpAddr) -> std::io::Result<Self> { //std::io::Result<Self>表示连接成功后返回的网络端结构体
         // 绑定端口 0 = 让操作系统随机分配一个本地端口（作为收发源端口）。
+        // UdpSocket::bind(("0.0.0.0", 0)) 表示绑定到所有 IP 地址（0.0.0.0）和端口 0（随机分配）。
         let udp = UdpSocket::bind(("0.0.0.0", 0))?;
+        // socket_addr::new(remote_ip, NET_UDP_PORT) 表示对端 NUC 的 UDP 地址（IP:NET_UDP_PORT）。
         let remote = SocketAddr::new(remote_ip, NET_UDP_PORT);
-
+        // 初始化发布端结构体。
         let publisher = Self {
-            udp,
-            remote,
-            seq: AtomicU64::new(0),
+            udp,     // 唯一 UDP socket：发送所有小包，并接收云台指令回包。
+            remote, // 对端 NUC 的 UDP 地址（IP:NET_UDP_PORT）  
+            seq: AtomicU64::new(0), // 全局递增包序号（原子，供多线程发送用）
             // 初值设为"已过期"（当前 - 一个心跳间隔），保证首次 update_heartbeat 就会发。
-            last_packet: Mutex::new(Instant::now() - HEARTBEAT_INTERVAL),
-            camera_info: Mutex::new(None),
-            runtime_state: Mutex::new(None),
-            image_slot: Arc::new(ImageSlot::new()),
-            tcp_connected: Arc::new(AtomicBool::new(false)),
-            gimbal_slot: Arc::new(Mutex::new(None)),
-            threads: Mutex::new(Vec::new()),
+            last_packet: Mutex::new(Instant::now() - HEARTBEAT_INTERVAL), // 上次成功发包的时刻（用于判断何时补发心跳）
+            camera_info: Mutex::new(None), // 相机内参 + 上次发送时刻（低频重发）
+            runtime_state: Mutex::new(None), // 上次发的运行状态（仅变化时重发）
+            image_slot: Arc::new(ImageSlot::new()), // 最新帧槽（渲染线程写、TCP 线程读）
+            tcp_connected: Arc::new(AtomicBool::new(false)), // TCP 是否已连上（未连上则跳过图像拷发）
+            gimbal_slot: Arc::new(Mutex::new(None)), // 收到的最近云台指令
+            threads: Mutex::new(Vec::new()), // 持有的后台线程句柄（随 publisher 一起释放）
         };
 
-        // 两条后台线程：一条收云台指令，一条持续发图像。
+        // 两条后台线程：一条收云台指令，一条持续发图像。+? 表示如果任意线程启动失败，抛出异常。
         publisher.spawn_udp_recv_thread()?;
         publisher.spawn_tcp_thread();
 
         Ok(publisher)
     }
 
+    /// 启动 UDP 接收线程，用于接收云台指令。 std::io::Result<()> 表示启动成功。
+    /// 如果启动失败，会抛出异常。
     fn spawn_udp_recv_thread(&self) -> std::io::Result<()> {
         // `try_clone`：复制一份 socket 句柄给接收线程用（原 socket 仍归 publisher 发送）。
         let socket = self.udp.try_clone()?;
+        // 复制一份 gimbal_slot（云台指令槽位句柄） 到线程中，用于接收云台指令。
         let gimbal_slot = self.gimbal_slot.clone();
+        // 启动 UDP 接收线程，用于接收云台指令。
         let handle = thread::Builder::new()
-            .name("talos-net-udp-recv".into())
-            .spawn(move || udp_recv_loop(socket, gimbal_slot))?;
-        self.threads.lock().unwrap().push(handle);
+            // - `handle`：UDP 接收线程句柄。
+            // - `name`：线程名，用于调试。 .into() 表示转换为 String 类型。
+            // - `spawn`：启动线程。 move || 表示在线程中执行闭包。
+            // - `expect`：如果线程启动失败，抛出异常。
+            .name("talos-net-udp-recv".into())// - `name`：线程名，用于调试。
+            .spawn(move || udp_recv_loop(socket, gimbal_slot))// - `spawn`：启动线程。
+            .expect("spawn talos-net udp recv thread");// - `expect`：如果线程启动失败，抛出异常。
+        self.threads.lock().unwrap().push(handle);// - `threads`：持有的后台线程句柄（随 publisher 一起释放）。
         Ok(())
     }
 
+    /// 启动 TCP 图像线程，持续发图像帧（JPEG 压缩 + 元数据）到对端 NUC。 std::io::Result<()> 表示启动成功。
+    /// 如果启动失败，会抛出异常。
     fn spawn_tcp_thread(&self) {
-        let remote_ip = self.remote.ip();
-        let image_slot = self.image_slot.clone();
-        let tcp_connected = self.tcp_connected.clone();
-        let handle = thread::Builder::new()
-            .name("talos-net-image".into())
-            .spawn(move || tcp_image_loop(remote_ip, image_slot, tcp_connected))
-            .expect("spawn talos-net image thread");
-        self.threads.lock().unwrap().push(handle);
+        let remote_ip = self.remote.ip();  // - `remote_ip`：对端 NUC 的 IP 地址。
+        let image_slot = self.image_slot.clone();// - `image_slot`：最新帧槽（渲染线程写、TCP 线程读）。
+        let tcp_connected = self.tcp_connected.clone();// - `tcp_connected`：TCP 是否已连上（未连上则跳过图像拷发）。
+        let handle = thread::Builder::new()// - `handle`：TCP 图像线程句柄。
+            .name("talos-net-image".into())// - `name`：线程名，用于调试。
+            .spawn(move || tcp_image_loop(remote_ip, image_slot, tcp_connected))// - `spawn`：启动线程。
+            .expect("spawn talos-net image thread");// - `expect`：如果线程启动失败，抛出异常。
+        self.threads.lock().unwrap().push(handle);// - `threads`：持有的后台线程句柄（随 publisher 一起释放）。
     }
 
     /// 发送一个 UDP 包（fire-and-forget，失败静默忽略，绝不阻塞渲染循环）。
@@ -283,20 +306,20 @@ impl NetIpcPublisher {
 
     /// 带辅助数据的位姿包：`aux_f32` 塞进 `PoseMeta._pad`（见 publisher.rs 的 `aux_f32_to_bytes`）。
     pub fn publish_pose_with_aux(
-        &self,
-        index: PoseIndex,
-        position: [f32; 3],
-        quaternion: [f32; 4],
-        aux_f32: [f32; 4],
-        frame_seq: u64,
-        timestamp_ns: u64,
+        &self,  
+        index: PoseIndex,// - `index`：位姿槽编号。
+        position: [f32; 3],// - `position`：`[x, y, z]`，单位 **米**，已转到 ROS 坐标系（见 plugin.rs 的 `M_ALIGN_MAT3`）；
+        quaternion: [f32; 4],// - `quaternion`：`[w, x, y, z]` 四元数（标量在前），单位/归一化；
+        aux_f32: [f32; 4],// - `aux_f32`：辅助数据，四个 f32 值。
+        frame_seq: u64, // - `frame_seq`：本帧递增序号，接收端用它判新旧、丢乱序；
+        timestamp_ns: u64,// - `timestamp_ns`：采集时刻，单位 **纳秒**（Unix 纪元）。
     ) {
         let pose = PoseMeta {
-            frame_seq,
-            position,
-            quaternion,
-            timestamp_ns,
-            _pad: aux_f32_to_bytes(aux_f32),
+            frame_seq,// - `frame_seq`：本帧递增序号，接收端用它判新旧、丢乱序；
+            position,// - `position`：`[x, y, z]`，单位 **米**，已转到 ROS 坐标系（见 plugin.rs 的 `M_ALIGN_MAT3`）；
+            quaternion,// - `quaternion`：`[w, x, y, z]` 四元数（标量在前），单位/归一化；
+            timestamp_ns,// - `timestamp_ns`：采集时刻，单位 **纳秒**（Unix 纪元）。
+            _pad: aux_f32_to_bytes(aux_f32),// - `_pad`：辅助数据，四个 f32 值。
         };
         // `index as u8`：PoseIndex 是 `#[repr(u8)]`，可直接转成协议里的槽编号字节。
         self.send_packet(PKT_TYPE_POSE, index as u8, bytes_of(&pose));
@@ -369,6 +392,8 @@ impl NetIpcPublisher {
     }
 
     /// 云台指令槽位句柄（供独立的订阅封装复用，避免持有整个 publisher）。
+    /// - 返回值：`Arc<Mutex<Option<GimbalCmd>>>`，
+    ///   表示对端最近一次收到的云台指令（None 表示未收到过）。
     pub fn gimbal_slot(&self) -> Arc<Mutex<Option<GimbalCmd>>> {
         self.gimbal_slot.clone()
     }
@@ -380,26 +405,36 @@ fn udp_recv_loop(socket: UdpSocket, gimbal_slot: Arc<Mutex<Option<GimbalCmd>>>) 
     loop {
         // `Ok((n, _src)) if n >= 64`：match 守卫——只有收到足够长的包才处理，
         // 满足要求的包按包头(32) + 载荷(32) 解析。
+        // recv_from 是 UDP 接收 API，用于从指定缓冲区接收数据包。
+        // 返回值：(接收字节数, 来源地址)。
+        // 如果接收成功，返回 (64, 128)（64 字节）。
         match socket.recv_from(&mut buf) {
+            // -n：接收字节数，必须 >= 64 字节。 _src：来源地址，未使用。
             Ok((n, _src)) if n >= 64 => {
+                // 校验包头：magic / version / type / payload_len。如果校验失败，直接跳过。
+                // （因为是阻塞收包，所以不会阻塞渲染线程，也无需等待超时。）
                 if !valid_packet_header(
-                    &buf[..size_of::<PacketHeader>()],
-                    PKT_TYPE_GIMBAL_CMD,
-                    size_of::<GimbalCmd>() as u16,
+                    &buf[..size_of::<PacketHeader>()], // 包头指针
+                    // 包头大小
+                    PKT_TYPE_GIMBAL_CMD, // 云台指令包类型
+                    size_of::<GimbalCmd>() as u16, // 云台指令载荷大小
                 ) {
                     continue;
                 }
-                // `buf[32..64]` 即载荷，`try_into` 把它转成定长 [u8; 32]。
+                // `buf[32..64]表示载荷`，`try_into` 把它转成定长 [u8; 32]。
                 let payload: [u8; 32] = buf[32..64].try_into().unwrap();
-                let mut cmd = GimbalCmd::default();
+                let mut cmd = GimbalCmd::default(); // 初始化云台指令结构体
                 // 载荷字节直接 memcpy 到结构体（同为小端，且来自对齐的栈缓冲）
                 unsafe {
+                    // `copy_nonoverlapping`：确保载荷字节不重叠，避免内存冲突。
+                    // 表示从载荷指针开始，复制 size_of::<GimbalCmd>() 字节到 cmd 指针。然后，将 cmd 指针转换为 u8 指针，确保可以访问结构体字段。
                     std::ptr::copy_nonoverlapping(
-                        payload.as_ptr(),
-                        &mut cmd as *mut GimbalCmd as *mut u8,
-                        size_of::<GimbalCmd>(),
+                        payload.as_ptr(), // 载荷字节指针
+                        &mut cmd as *mut GimbalCmd as *mut u8, // 目标指针（结构体字段）
+                        size_of::<GimbalCmd>(),//gimbal_cmd 字段大小
                     );
                 }
+                // 写入共享槽位：覆盖式写入，永远保留最近一条指令。
                 if let Ok(mut slot) = gimbal_slot.lock() {
                     *slot = Some(cmd); // 覆盖式写入：永远保留最近一条指令
                 }
@@ -411,18 +446,25 @@ fn udp_recv_loop(socket: UdpSocket, gimbal_slot: Arc<Mutex<Option<GimbalCmd>>>) 
 
 /// 校验包头：magic / version / type / payload_len。
 /// 逐字段按小端从原始字节手动解析（不依赖结构体内存布局），确保脏包/异构包被丢弃。
+/// header：包头指针，必须指向 32 字节的内存。
+/// expect_type：期望的包类型。
+/// expect_payload_len：期望的载荷大小。
 fn valid_packet_header(header: &[u8], expect_type: u8, expect_payload_len: u16) -> bool {
     if header.len() < size_of::<PacketHeader>() {
         return false;
     }
+    // 解析包头字段     header[0..4] magic
     let magic = u32::from_le_bytes(header[0..4].try_into().unwrap());
+    // 解析包头字段     header[4..6] version(语法：[4..6] 表示从第 5 个字节开始，取 2 个字节)
     let version = u16::from_le_bytes(header[4..6].try_into().unwrap());
+    // 解析包头字段     header[6..8] payload_len
     let payload_len = u16::from_le_bytes(header[6..8].try_into().unwrap());
+    // 解析包头字段     header[8] pkt_type
     let pkt_type = header[8];
-    magic == NET_MAGIC
-        && version == NET_VERSION
-        && pkt_type == expect_type
-        && payload_len == expect_payload_len
+    magic == NET_MAGIC // 校验 magic 字段
+               && version == NET_VERSION // 校验 version 字段
+               && pkt_type == expect_type // 校验 pkt_type 字段
+               && payload_len == expect_payload_len // 校验 payload_len 字段
 }
 
 /// TCP 图像线程主循环：连上就发流，断开则按 `TCP_RECONNECT_DELAY` 重连，永不退出。
@@ -435,7 +477,9 @@ fn tcp_image_loop(remote_ip: IpAddr, image_slot: Arc<ImageSlot>, connected: Arc<
                 let _ = stream.set_nodelay(true); // 禁用 Nagle：低延迟小包更重要
                 let _ = stream.set_write_timeout(Some(Duration::from_secs(2))); // 写阻塞上限
                 connected.store(true, Ordering::Relaxed); // 通知发布端"可发图了"
-                eprintln!("talos-net: image stream connected to {}", addr);
+                eprintln!("talos-net: image stream connected to {}", addr); // 连接成功
+                // 发送图像流：不断取最新帧、编码、写出。
+                // 如果发送出错，重试。
                 if let Err(e) = image_stream_loop(&mut stream, &image_slot) {
                     eprintln!("talos-net: image stream error: {}, reconnecting", e);
                 }
@@ -455,44 +499,51 @@ fn image_stream_loop(stream: &mut TcpStream, image_slot: &ImageSlot) -> std::io:
         // 按值取走帧：缓冲所有权移交编码器，全链路零多余拷贝（无帧时在此阻塞等待）
         let raw = image_slot.take();
         let (seq, timestamp_ns) = (raw.seq, raw.timestamp_ns);
-        let jpeg = encode_jpeg(raw)?;
+        let jpeg = encode_jpeg(raw)?;// 编码图像为 JPEG 格式。
 
+        // 构造图像头：包含图像元数据（宽度、高度、长度）。
         let header = ImageFrameHeader {
-            magic: NET_MAGIC,
-            pkt_type: PKT_TYPE_IMAGE,
-            _pad: [0; 3],
-            width: IMAGE_WIDTH,
-            height: IMAGE_HEIGHT,
-            jpeg_len: jpeg.len() as u32,
-            _pad2: 0,
-            seq,
-            timestamp_ns,
+            magic: NET_MAGIC,// - `magic`：协议魔数，用于校验包头。
+            pkt_type: PKT_TYPE_IMAGE,// - `pkt_type`：包类型，用于判断包内容。
+            _pad: [0; 3],// - `_pad`：保留字段，当前版本未使用。
+            width: IMAGE_WIDTH,// - `width`：图像宽度，单位像素。
+            height: IMAGE_HEIGHT,// - `height`：图像高度，单位像素。
+            jpeg_len: jpeg.len() as u32,// - `jpeg_len`：JPEG 数据长度，单位字节。
+            _pad2: 0,// - `_pad2`：保留字段，当前版本未使用。
+            seq,// - `seq`：本帧递增序号，接收端用它判新旧、丢乱序。
+            timestamp_ns,// - `timestamp_ns`：采集时刻，单位 **纳秒**（Unix 纪元）。
         };
 
         // 帧头与 JPEG 数据分两次写、最后一次 flush 一起推送（保证对端读到完整一帧）。
-        stream.write_all(bytes_of(&header))?;
-        stream.write_all(&jpeg)?;
-        stream.flush()?;
+        // - `write_all`：确保所有字节写入，不阻塞。
+        stream.write_all(bytes_of(&header))?;// 写入图像头。
+        stream.write_all(&jpeg)?;// 写入 JPEG 数据。
+        stream.flush();// 刷新写缓冲区，确保数据立即发送。
     }
 }
 
 /// JPEG 编码；分辨率必须严格 1440×1080，渲染分辨率不同时先 resize。
 /// 按值接收帧：缓冲所有权移交（不 clone），编码后即释放。
 fn encode_jpeg(mut raw: RawImageFrame) -> std::io::Result<Vec<u8>> {
-    use image::codecs::jpeg::JpegEncoder;
-    use image::imageops::FilterType;
-    use image::{ExtendedColorType, ImageBuffer, ImageEncoder, RgbImage};
+    use image::codecs::jpeg::JpegEncoder;// - `JpegEncoder`：JPEG 编码器。
+    use image::imageops::FilterType;// - `FilterType`：图像缩放滤波类型。
+    use image::{ExtendedColorType, ImageBuffer, ImageEncoder, RgbImage};// - `ExtendedColorType`：扩展颜色类型。
+    // - `ImageBuffer`：图像缓冲区，用于存储图像数据。
+    // - `ImageEncoder`：图像编码器，用于将图像数据编码为指定格式。
 
     // 通道序开关：捕获缓冲按 BGR 解释（与对端 imdecode→共享内存→talos 链路约定
     // 一致），先交换 R/B 再按 RGB 编码。若对端颜色反而更歪（说明缓冲本就是
     // RGB 序），删掉下面的 swap 循环即可。
     for pixel in raw.data.chunks_exact_mut(3) {
-        pixel.swap(0, 2);
+        pixel.swap(0, 2);// - `pixel`：图像像素，包含 R/G/B 三通道。
     }
 
+    // 从原始缓冲创建 RGB 图像。
     let rgb = RgbImage::from_raw(raw.width, raw.height, std::mem::take(&mut raw.data))
         .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "bad image size"))?;
 
+    // 重采样：若渲染分辨率不同时，先按三角形滤波重采样到 1440×1080。
+    // 若渲染分辨率与捕获分辨率相同，直接返回捕获缓冲。
     let frame: ImageBuffer<image::Rgb<u8>, Vec<u8>> =
         if raw.width != IMAGE_WIDTH || raw.height != IMAGE_HEIGHT {
             image::imageops::resize(&rgb, IMAGE_WIDTH, IMAGE_HEIGHT, FilterType::Triangle)
@@ -500,14 +551,16 @@ fn encode_jpeg(mut raw: RawImageFrame) -> std::io::Result<Vec<u8>> {
             rgb
         };
 
-    let mut out = Vec::new();
-    let encoder = JpegEncoder::new_with_quality(&mut out, JPEG_QUALITY);
+    // 编码 JPEG 数据。
+    let mut out = Vec::new();// - `out`：输出缓冲区，用于存储编码后的 JPEG 数据。
+    let encoder = JpegEncoder::new_with_quality(&mut out, JPEG_QUALITY);// - `encoder`：JPEG 编码器，用于将图像数据编码为 JPEG 格式。
+    // 编码图像数据：将 RGB 图像编码为 JPEG 格式。
     encoder
-        .write_image(
-            frame.as_raw(),
-            frame.width(),
-            frame.height(),
-            ExtendedColorType::Rgb8,
+        .write_image(   
+            frame.as_raw(),// - `frame.as_raw()`：将图像缓冲区转换为原始数据指针。
+            frame.width(),// - `frame.width()`：图像宽度，单位像素。
+            frame.height(),// - `frame.height()`：图像高度，单位像素。
+            ExtendedColorType::Rgb8,// - `ExtendedColorType::Rgb8`：RGB 8 位颜色，每个通道 8 位。
         )
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
     Ok(out)

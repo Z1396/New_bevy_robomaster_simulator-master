@@ -1,45 +1,33 @@
 # Bevy RoboMaster Simulator Configuration
 # 【总说明】仿真器主配置文件，TOML格式，控制渲染、相机、物理、车辆、弹丸、Livox雷达等全部参数
 [window]
-# Rendering present mode. Use `auto_no_vsync` to exceed 60Hz for Talos/ROS2 capture.
-# Options: auto_vsync, auto_no_vsync, fifo, fifo_relaxed, mailbox, immediate
+# Options: auto_vsync(开启vsync锁60帧), auto_no_vsync(关闭vsync), fifo(严格FIFO), fifo_relaxed(松散FIFO), mailbox(邮箱), immediate(立即模式)
 present_mode = "auto_no_vsync" # 渲染呈现模式；auto_no_vsync关闭垂直同步，突破60帧，方便Talos/ROS2采集图像
 # 可选值：auto_vsync(开启vsync锁60帧)、auto_no_vsync(关闭vsync)、fifo/fifo_relaxed/mailbox/immediate（Vulkan底层呈现模式）
 
 [debug]
-# Turn these on only when needed; they noticeably reduce FPS.
-egui = false        # 开启Egui调试UI界面，开启会大幅掉帧，默认关闭
-inspector = false   # Bevy实体检视器，查看场景物体组件，耗性能，关闭
-# Prints FPS/frametime diagnostics to console.
+egui = true        # 开启Egui调试UI界面，开启会大幅掉帧，默认关闭
+inspector = true   # Bevy实体检视器，查看场景物体组件，耗性能，关闭
 diagnostics = true  # 控制台输出FPS、帧耗时等性能诊断信息（你日志里bevy_diagnostic就是这个输出）
 
 [preview]
-# On-screen preview camera. Disable to avoid rendering the scene twice (preview + capture).
 enabled = true      # 屏幕预览相机开关；true=窗口显示画面；false=只后台渲染供采集，不显示窗口画面，减少一次渲染开销
 
 [render]
-# Expensive on large scenes; disable for higher FPS.
 # 【修改】true -> false：新增展示战车后 16GB 机器上 GPU 显存 OOM（Caught rendering
 # error: Out of Memory），阴影贴图是最大开销项；需要阴影时再手动打开。
-shadows = false             # 阴影渲染开关，阴影显存开销巨大，战车场景容易爆显存，这里关闭
-# Main on-screen camera anti-aliasing.
+shadows = true             # 阴影渲染开关，阴影显存开销巨大，战车场景容易爆显存，这里开启
 main_camera_fxaa = true     # 主预览相机FXAA快速抗锯齿，画面边缘减少锯齿，开销低
-# Enables Apple's MetalFX temporal scaler for color 3D cameras on macOS.
 metalfx_temporal = true     # macOS专用MetalFX时间缩放，Windows/Linux直接忽略该配置
-# Enables MetalFX frame interpolation after temporal upscaling.
-# Needs macOS 26 or newer; ignored (with a log line) elsewhere.
 metalfx_frame_generation = false # macOS帧插补，非macOS平台无效
-# Output/render resolution ratio used by MetalFX temporal upscaling. Clamped to 1.0..=3.0.
 metalfx_scale = 2.0         # MetalFX超分缩放倍率，仅macOS生效
 illuminance = 500.0         # 全局光照亮度，单位lux，控制场景整体明暗
 
 [capture.color]
-# RGB capture resolution for existing camera pipeline.
 width = 1440    # 仿真采集RGB图像宽度，传给Talos图像链路
 height = 1080   # 仿真采集RGB图像高度，1440×1080，就是你崩溃时4.6M图像buffer来源
 
 [capture.depth]
-# Depth capture resolution for livox-compatible point cloud output.
 width = 1280    # 深度图宽度，用于生成Livox点云
 height = 720    # 深度图高度
 near = 0.1      # 深度相机近裁剪面，小于0.1m物体不渲染深度

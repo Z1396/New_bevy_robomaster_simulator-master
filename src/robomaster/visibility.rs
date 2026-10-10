@@ -180,6 +180,8 @@ impl Controller {
 /// `muted` 以原材质 id 为键、熄灭副本句柄为值——"一个原材质只做一份熄灭副本"。
 #[derive(Resource, Default)]
 struct MaterialCache {
+    /// 缓存：以原材质 id 为键、熄灭副本句柄为值。
+    /*ssetId<StandardMaterial>表示标准材质的id，Handle<StandardMaterial>表示标准材质的句柄 都是官方提供的类型*/
     muted: HashMap<AssetId<StandardMaterial>, Handle<StandardMaterial>>,
 }
 

@@ -53,6 +53,7 @@ pub fn setup(
 ) {
     // 关掉 egui 自动创建主上下文：本项目把 egui 挂在自己的主相机上（见下方 PrimaryEguiContext）。
     if let Some(mut egui_global_settings) = egui_global_settings {
+        //auto_create_primary_context：是否自动创建 egui 的主上下文。
         egui_global_settings.auto_create_primary_context = false;
     }
     // 生成左下角状态栏等 2D 文字实体。
@@ -60,11 +61,13 @@ pub fn setup(
     // 平行光：`illuminance` 单位是勒克斯（lux），取自 config.render.illuminance；
     // 是否投影由 config.render.shadows 决定（阴影贴图开销大，见 config.toml 的【修改】说明）。
     commands.spawn((
+        // 平行光：`illuminance` 单位是勒克斯（lux），取自 config.render.illuminance；
+        // 是否投影由 config.render.shadows 决定（阴影贴图开销大，见 config.toml 的【修改】说明）。
         DirectionalLight {
             color: Color::srgb(0.9, 0.95, 1.0), // 略偏冷的白光（sRGB 分量 0~1）
-            illuminance: config.render.illuminance,
-            shadow_maps_enabled: config.render.shadows,
-            contact_shadows_enabled: config.render.shadows,
+            illuminance: config.render.illuminance, // 灯的亮度（勒克斯）
+            shadow_maps_enabled: config.render.shadows, // 是否投影阴影贴图
+            contact_shadows_enabled: config.render.shadows, // 是否开启接触阴影
             ..default() // 结构体更新语法：其余字段取 Default 值
         },
         // 灯放在 (0, 4, 0)，朝原点看；上方向取 (1,1,1) 得到自然的斜射方向（单位：米）。
@@ -76,6 +79,7 @@ pub fn setup(
 
     // `spawn` 返回 `EntityCommands`，可继续 `.insert(...)` 往这个实体追加组件。
     let mut main_camera = commands.spawn((
+        // 主相机：`Camera3d` 是 3D 相机组件，`Camera` 是通用相机组件。
         Camera3d::default(),
         Camera {
             // When Talos/ROS2 capture is enabled, the actual on-screen preview is a UI blit of the
@@ -92,9 +96,9 @@ pub fn setup(
         // 透视投影：`fov` 需要弧度，而 config.toml 里写的是**度**，故 `to_radians()` 转换；
         // `near`/`far` 是裁剪面距离（米），far 取极大值以保证远景（天空/远山）不被裁掉。
         Projection::Perspective(PerspectiveProjection {
-            fov: config.camera.fov.to_radians(),
-            near: 0.1,
-            far: 500000000.0,
+            fov: config.camera.fov.to_radians(), // 视野角度（弧度）
+            near: 0.1, // 近裁剪面距离（米）
+            far: 500000000.0, // 远裁剪面距离（米）
             ..default()
         }),
         // 关闭色调映射：输出保持线性原始色彩，便于视觉算法（Talos）拿到未经美化的图像。

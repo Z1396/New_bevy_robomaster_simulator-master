@@ -26,3 +26,10 @@
 - `HierarchyQuery`（util/entity_query.rs）：`of(root).any().exact("..").flatten()` 链式；`one()` 取恰好一个。
 - `CAM_DIRECTION`(InfantryViewOffset) 与 `systems/camera.rs` Robot 模式一致。
 - 场景线性异步加载：机器人必须最后生成，否则掉出地板（scene.rs）。
+
+## 项目规模（2026-10-09 实测，排除 target/ 与 .git）
+- 项目自有 Rust（src/ 78 + crates/ 15 = 93 个 .rs）：有效代码 13,308 行 / 注释 3,809 行 / 空行 1,789 行。
+- 其中 src/ 明细（代码行）：robomaster/ 4061、systems/ 1752、顶层文件 1330、ros2/ 1111、capture/ 1016、talos/ 858、util/ 617、bin/ 244、components/ 199、telemetry/ 62。
+- 整个仓库（130 个源文件）：有效代码 57,285 行、总 64,219 行；但其中 third_party/r2r_msg_gen/bindings/msg_bindings.rs 一个自动生成文件就占 34,061 行，Cargo.lock 占 8,107 行。
+- 剔除第三方/生成/锁文件后，项目自身约 13,624 行有效代码。
+- 结论口径：谈论"项目代码量"时应排除 third_party/ 与 Cargo.lock，否则会被生成物放大 3~4 倍。

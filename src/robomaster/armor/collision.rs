@@ -45,6 +45,13 @@ fn handle_armor_collision(
     // `and_then` 是 Option 的链式处理：body1 是子弹就取 Some(实体)，否则 None。
     // 细节拆解：`projectiles.get(body)` 返回 Result（查询不一定命中），
     // `.ok()` 把 Result 转成 Option（Err 丢弃、Ok 取值）——之后全用 Option 链处理。
+    // 这里筛选出 body1 中是子弹的实体，若 body2 也是子弹则取 body2。为什么？
+    // 因为子弹是刚体，装甲是碰撞体，刚体和碰撞体不能同时在物理空间里。
+    // 所以，当子弹和装甲碰撞时，子弹是 body1，装甲是 collider2。
+    // 若 body1 都不是子弹，返回 None。
+    // body1与body2有什么区别？
+    // body1 是碰撞双方的刚体实体，body2 是碰撞双方的碰撞体实体。
+    // 这里 body1 是子弹，body2 是装甲。
     let projectile_body1 = event.body1.and_then(|body| projectiles.get(body).ok());
     let projectile_body2 = event.body2.and_then(|body| projectiles.get(body).ok());
 
@@ -90,6 +97,7 @@ fn handle_armor_collision(
     // 资源直写立即生效：同一物理步内命中多块装甲也只计一次。
     // （这就是不用 Commands 的原因：Commands 插入的资源/组件要到下一次
     //  apply 阶段才可见，本帧内的后续观察者看不到，防重复合数会失效。）
+    // mark_hit()：标记子弹命中了敌方装甲。
     stats.mark_hit(projectile_entity);
 }
 
@@ -112,6 +120,11 @@ pub(super) struct ArmorCollisionPlugin;
 // 里被安装时，build() 执行一次——这里是本文件两个观察者的注册入口。
 impl Plugin for ArmorCollisionPlugin {
     fn build(&self, app: &mut bevy::app::App) {
+        // 注册两个观察者：物理碰撞事件和子弹销毁事件。发生时分别触发。
+        // 物理碰撞事件：当子弹与装甲碰撞时触发，统计命中敌方装甲。
+        // 子弹销毁事件：当子弹 despawn 时触发，清理去重记录，防止集合无限增长。
+        // 这两个事件分别触发 `handle_armor_collision` 和 `on_projectile_removed` 函数。
+        // 观察者在物理系统（PhysicsSystem）和更新系统（UpdateSystem）里执行，确保在物理更新后和更新前。
         app.add_observer(handle_armor_collision);
         app.add_observer(on_projectile_removed);
     }
