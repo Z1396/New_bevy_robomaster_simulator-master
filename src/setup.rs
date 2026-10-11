@@ -40,8 +40,7 @@ use bevy_metalfx::{MetalFxTemporalUpscaling, UpscaleFactor}; // macOS 时空上�
 pub struct ScanOutpost;
 
 /// 启动时的全局初始化（`Startup` 阶段只执行一次）：屏幕文字、平行光、主相机。
-///
-/// 注意：场景里的实体（地面/机器人等）**不**在这里生成——它们由 `ScenePlugin` 按加载顺序产出。
+/// 注意：场景里的实体（地面/机器人等）不在这里生成——它们由 `ScenePlugin` 按加载顺序产出。
 pub fn setup(
     // `Commands`：延迟执行的"世界修改队列"——本帧写入，稍后统一 apply 生效。
     mut commands: Commands,

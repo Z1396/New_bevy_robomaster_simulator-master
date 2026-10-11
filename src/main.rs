@@ -213,18 +213,18 @@ fn main() {
         .add_plugins(MetalFxPlugin)//金属特效插件
         .add_plugins(crate::scene::ScenePlugin)//场景插件
         .add_plugins(ConfigPlugin)//配置插件
-        // `init_resource`：用 Default::default() 创建全局资源（类型必须实现 Default）；
-        // 与 `insert_resource`（直接给值）的区别只是"谁来提供初始值"。
+        //`init_resource`：用 Default::default() 创建全局资源（类型必须实现 Default）；
+        //与 `insert_resource`（直接给值）的区别只是"谁来提供初始值"。
         //insert_resource 是在启动时初始化一次一定要给初始值，而 init_resource 是在每帧都初始化一次可以不给初始值。
         .init_resource::<CameraMode>()//相机模式资源
         .init_resource::<ProjectileStatistics>()//子弹统计资源
         .init_resource::<ChassisObservationFrame>()//战车观测帧资源
         .init_resource::<PreviousKinematicState>()//上一帧运动状态资源
         .init_resource::<ControllerState>()//控制器状态资源
-        // `register_type`：注册反射信息，让 egui 检视器/序列化能在运行时枚举字段。
-        .register_type::<ProjectileStatistics>()//子弹统计资源
-        // 以下都是 avian 物理引擎的全局设置：重力方向、子步数（每物理步内细分求解次数，
-        // 越大越稳定越费 CPU）、固定物理步长（120Hz，与渲染帧率解耦）。
+        // // `register_type`：注册反射信息，让 egui 检视器/序列化能在运行时枚举字段。
+        // .register_type::<ProjectileStatistics>()//子弹统计资源
+        // // 以下都是 avian 物理引擎的全局设置：重力方向、子步数（每物理步内细分求解次数，
+        // // 越大越稳定越费 CPU）、固定物理步长（120Hz，与渲染帧率解耦）。
         .insert_resource(Gravity(Vec3::NEG_Y * 9.81))//重力方向
         .insert_resource(SubstepCount(config.physics.substep_count))//子步数
         .insert_resource(fixed_time_from_config(&config))//固定物理步长
@@ -233,127 +233,127 @@ fn main() {
         .insert_resource(ProjectileCooldown(Timer::from_seconds(
             config.projectile.cooldown,
             TimerMode::Once,
-        )))//子弹冷却时间
+         )))//子弹冷却时间
         // `Startup` 系统只在启动时执行一次（创建相机、灯光、子弹材质、飞镖资产等一次性初始化）。
-        .add_systems(Startup, (setup, setup_projectile))
+         .add_systems(Startup, (setup, setup_projectile))
         // `add_observer`：注册观察者——不进每帧调度表，而是"事件发生时被调用"的回调。
         // on_hit/on_activate 响应能量机关的命中/激活事件。
-        .add_observer(on_hit)
-        .add_observer(on_activate)
+        // .add_observer(on_hit)
+        // .add_observer(on_activate)
         // ---- 调度时间表 ----
         // `configure_sets` 定义四个"系统集合"，`.chain()` 让它们严格按声明顺序执行。
         // 之后再 add_systems 时用 `.in_set(...)` 把系统挂进对应集合。
-        .configure_sets(
-            Update,
-            (
-                GameplaySystems::Input,
-                GameplaySystems::GameLogic,
-                GameplaySystems::Camera,
-                GameplaySystems::Cleanup,
-            )
-            .chain(),
-        )
-        .add_systems(
-            Update,
-            (
-                // Input phase —— 本帧的一切从输入采样开始。
-                // `.chain()`：这批系统也按声明顺序执行（先采样、再切车、再操控）。
-                // `.run_if(...)`：条件系统——闭包返回 false 时本帧跳过该系统
-                //（例如自由相机模式下就不跑车辆操控）。
-                // 逐个系统职责：
-                (
-                    // 清空上一帧的输入状态，避免按键状态跨帧残留
-                    clear_controller_input,
-                    // 从键盘/手柄采样原始输入，汇总进全局 ControllerState 资源
-                    sample_keyboard_controller,
-                    // 从手柄采样原始输入，汇总进全局 ControllerState 资源
-                    sample_gamepad_controller,
-                    // 自瞄订阅开关状态同步（talos/ROS2 是否要接收相机数据）
-                    update_auto_aim_subscription,
-                    // Tab 换相机模式：Robot 第一人称 → 第三人称 → 自由
-                    following_controls,
-                    // Tab 轮换"操控哪台车"（switch 键在此读取）
-                    switch_slapper_control,
-                    // 底盘驾驶（IJKL/摇杆）——自由相机模式下没意义，条件跳过
-                    vehicle_controls.run_if(|mode: Res<CameraMode>| mode.0 != FollowingType::Free),
-                    // 遥控器/上位机的远程驾驶指令
-                    remote_vehicle_controls,
-                    // 玩家手动控制云台（UO 俯仰）
-                    gimbal_controls,
-                    // 自瞄云台闭环：外部视觉回传的 yaw/pitch 指令经 PID 追踪
-                    //（只在自瞄订阅开启时运行）
-                    gimbal_pid_controls.run_if(|enabled: Res<SubscribeAutoAim>| {
-                        enabled.load(std::sync::atomic::Ordering::Acquire)
-                    }),
-                    // 远程云台指令（非自瞄回路）
-                    remote_gimbal_controls,
-                )
-                .chain()
-                .in_set(GameplaySystems::Input),
+        // .configure_sets(
+        //     Update,
+        //     (
+        //         GameplaySystems::Input,
+        //         GameplaySystems::GameLogic,
+        //         GameplaySystems::Camera,
+        //         GameplaySystems::Cleanup,
+        //     )
+        //     .chain(),
+        // )
+        // .add_systems(
+        //     Update,
+        //     (
+        //         // Input phase —— 本帧的一切从输入采样开始。
+        //         // `.chain()`：这批系统也按声明顺序执行（先采样、再切车、再操控）。
+        //         // `.run_if(...)`：条件系统——闭包返回 false 时本帧跳过该系统
+        //         //（例如自由相机模式下就不跑车辆操控）。
+        //         // 逐个系统职责：
+        //         (
+        //             // 清空上一帧的输入状态，避免按键状态跨帧残留
+        //             clear_controller_input,
+        //             // 从键盘/手柄采样原始输入，汇总进全局 ControllerState 资源
+        //             sample_keyboard_controller,
+        //             // 从手柄采样原始输入，汇总进全局 ControllerState 资源
+        //             sample_gamepad_controller,
+        //             // 自瞄订阅开关状态同步（talos/ROS2 是否要接收相机数据）
+        //             update_auto_aim_subscription,
+        //             // Tab 换相机模式：Robot 第一人称 → 第三人称 → 自由
+        //             following_controls,
+        //             // Tab 轮换"操控哪台车"（switch 键在此读取）
+        //             switch_slapper_control,
+        //             // 底盘驾驶（IJKL/摇杆）——自由相机模式下没意义，条件跳过
+        //             vehicle_controls.run_if(|mode: Res<CameraMode>| mode.0 != FollowingType::Free),
+        //             // 遥控器/上位机的远程驾驶指令
+        //             remote_vehicle_controls,
+        //             // 玩家手动控制云台（UO 俯仰）
+        //             gimbal_controls,
+        //             // 自瞄云台闭环：外部视觉回传的 yaw/pitch 指令经 PID 追踪
+        //             //（只在自瞄订阅开启时运行）
+        //             gimbal_pid_controls.run_if(|enabled: Res<SubscribeAutoAim>| {
+        //                 enabled.load(std::sync::atomic::Ordering::Acquire)
+        //             }),
+        //             // 远程云台指令（非自瞄回路）
+        //             remote_gimbal_controls,
+        //         )
+        //         .chain()
+        //         .in_set(GameplaySystems::Input),
 
 
-                // GameLogic phase
-                // 【修改】新增 spin_display_vehicle：展示战车闲置自转（提交 b120db1）。
-                // 放在 GameLogic（晚于 Input 阶段）：Tab 选中时 Input 阶段插入的
-                // ActiveSlapper 在本阶段前生效，自转系统同帧失配实现"瞬停"。
-                // 另两个：C/B 键换装甲贴纸样式、刷新左下角状态栏文字
-                (
-                    spin_display_vehicle, // 战车闲置自转
-                    change_appearance, // 装甲贴纸样式切换
-                    update_help_text // 刷新状态栏文字
-                )
-                .in_set(GameplaySystems::GameLogic),
+        //         // GameLogic phase
+        //         // 【修改】新增 spin_display_vehicle：展示战车闲置自转（提交 b120db1）。
+        //         // 放在 GameLogic（晚于 Input 阶段）：Tab 选中时 Input 阶段插入的
+        //         // ActiveSlapper 在本阶段前生效，自转系统同帧失配实现"瞬停"。
+        //         // 另两个：C/B 键换装甲贴纸样式、刷新左下角状态栏文字
+        //         (
+        //             spin_display_vehicle, // 战车闲置自转
+        //             change_appearance, // 装甲贴纸样式切换
+        //             update_help_text // 刷新状态栏文字
+        //         )
+        //         .in_set(GameplaySystems::GameLogic),
 
 
-                // Camera phase —— 相机在游戏逻辑算完后才跟随，保证跟的是本帧结果
-                (
-                    freecam_controls.run_if(|mode: Res<CameraMode>| mode.0 == FollowingType::Free), // 自由相机模式
-                    // 第一人称/第三人称相机模式
-                    systems::update_camera_follow
-                        .run_if(|mode: Res<CameraMode>| mode.0 != FollowingType::Free),
-                )
-                .in_set(GameplaySystems::Camera)
-                // 再早于渲染阶段，确保渲染用的是移动后的相机。
-                .before(RenderSystems::Render),
+        //         // Camera phase —— 相机在游戏逻辑算完后才跟随，保证跟的是本帧结果
+        //         (
+        //             freecam_controls.run_if(|mode: Res<CameraMode>| mode.0 == FollowingType::Free), // 自由相机模式
+        //             // 第一人称/第三人称相机模式
+        //             systems::update_camera_follow
+        //                 .run_if(|mode: Res<CameraMode>| mode.0 != FollowingType::Free),
+        //         )
+        //         .in_set(GameplaySystems::Camera)
+        //         // 再早于渲染阶段，确保渲染用的是移动后的相机。
+        //         .before(RenderSystems::Render),
 
 
-                // Cleanup phase —— 帧末清理：到期子弹销毁、F2 截图等
-                (
-                    // 巡检所有子弹的寿命计时器，到期的 despawn（销毁实体）
-                    cleanup_projectiles,
-                    // F2 触发一次截图（`.run_if` 里读的是"刚按下"这一瞬间）
-                    screenshot_on_f2
-                        .run_if(|input: Res<ButtonInput<KeyCode>>| input.just_pressed(KeyCode::F2)),
-                    // 截图保存期间给窗口转圈光标
-                    screenshot_saving,
-                )
-                    .in_set(GameplaySystems::Cleanup),
-            ),
-        )
-        // PostUpdate = 渲染前的收尾阶段。发射子弹（车/飞镖/UAV）放在这里，
-        // 且 `.after(TransformSystems::Propagate)`：必须等 Bevy 把本帧的父子变换
-        // 累积计算完（世界矩阵更新），才能拿到炮口的最新世界位置/朝向，否则会
-        // 用上一帧的旧位置生成子弹。
-        .add_systems(
-            PostUpdate, // 渲染前的收尾阶段
-            // 更新战车位姿（包括云台）
-            // 必须在渲染前，确保渲染用的是最新位姿。TransformSystems::Propagate表示等待所有变换更新完成。
-            update_chassis_observation.after(TransformSystems::Propagate),
-        )
-        .add_systems(
-            PostUpdate,
-            projectile_launch
-                .after(TransformSystems::Propagate)
-                .run_if(controller_shoot_pressed),// run_if：只在按下射击键时发射子弹
-        )
-        .add_systems(
-            PostUpdate,
-            dart_launch
-                .after(TransformSystems::Propagate)
-                .run_if(controller_dart_just_pressed),// run_if：只在按下飞镖键时发射飞镖
-        )
-        // 无人机检测模块：UAV_LAUNCH_DIRECTION（默认 p 键）
-        .add_systems(PostUpdate, uav_launch.after(TransformSystems::Propagate))
+        //         // Cleanup phase —— 帧末清理：到期子弹销毁、F2 截图等
+        //         (
+        //             // 巡检所有子弹的寿命计时器，到期的 despawn（销毁实体）
+        //             cleanup_projectiles,
+        //             // F2 触发一次截图（`.run_if` 里读的是"刚按下"这一瞬间）
+        //             screenshot_on_f2
+        //                 .run_if(|input: Res<ButtonInput<KeyCode>>| input.just_pressed(KeyCode::F2)),
+        //             // 截图保存期间给窗口转圈光标
+        //             screenshot_saving,
+        //         )
+        //             .in_set(GameplaySystems::Cleanup),
+        //     ),
+        // )
+        // // PostUpdate = 渲染前的收尾阶段。发射子弹（车/飞镖/UAV）放在这里，
+        // // 且 `.after(TransformSystems::Propagate)`：必须等 Bevy 把本帧的父子变换
+        // // 累积计算完（世界矩阵更新），才能拿到炮口的最新世界位置/朝向，否则会
+        // // 用上一帧的旧位置生成子弹。
+        // .add_systems(
+        //     PostUpdate, // 渲染前的收尾阶段
+        //     // 更新战车位姿（包括云台）
+        //     // 必须在渲染前，确保渲染用的是最新位姿。TransformSystems::Propagate表示等待所有变换更新完成。
+        //     update_chassis_observation.after(TransformSystems::Propagate),
+        // )
+        // .add_systems(
+        //     PostUpdate,
+        //     projectile_launch
+        //         .after(TransformSystems::Propagate)
+        //         .run_if(controller_shoot_pressed),// run_if：只在按下射击键时发射子弹
+        // )
+        // .add_systems(
+        //     PostUpdate,
+        //     dart_launch
+        //         .after(TransformSystems::Propagate)
+        //         .run_if(controller_dart_just_pressed),// run_if：只在按下飞镖键时发射飞镖
+        // )
+        // // 无人机检测模块：UAV_LAUNCH_DIRECTION（默认 p 键）
+        // .add_systems(PostUpdate, uav_launch.after(TransformSystems::Propagate))
         // FixedUpdate：固定频率调度（默认随物理 120Hz），空气阻力按固定步长计算更稳定。
         .add_systems(FixedUpdate, projectile_aerodynamics);
 

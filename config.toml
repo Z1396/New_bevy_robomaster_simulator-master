@@ -7,7 +7,7 @@ present_mode = "auto_no_vsync" # 渲染呈现模式；auto_no_vsync关闭垂直�
 
 [debug]
 egui = false        # 开启Egui调试UI界面，开启会大幅掉帧，默认关闭
-inspector = false   # Bevy实体检视器，查看场景物体组件，耗性能，关闭
+inspector = false   # Bevy实体检视器，查看场景物体组件，耗性能，关闭后性能提升
 diagnostics = true  # 控制台输出FPS、帧耗时等性能诊断信息（你日志里bevy_diagnostic就是这个输出）
 
 [preview]
@@ -16,7 +16,7 @@ enabled = true      # 屏幕预览相机开关；true=窗口显示画面；false
 [render]
 # 【修改】true -> false：新增展示战车后 16GB 机器上 GPU 显存 OOM（Caught rendering
 # error: Out of Memory），阴影贴图是最大开销项；需要阴影时再手动打开。
-shadows = true             # 阴影渲染开关，阴影显存开销巨大，战车场景容易爆显存，这里开启
+shadows = false             # 阴影渲染开关，阴影显存开销巨大，战车场景容易爆显存，这里开启
 main_camera_fxaa = true     # 主预览相机FXAA快速抗锯齿，画面边缘减少锯齿，开销低
 metalfx_temporal = true     # macOS专用MetalFX时间缩放，Windows/Linux直接忽略该配置
 metalfx_frame_generation = false # macOS帧插补，非macOS平台无效
