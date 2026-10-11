@@ -105,8 +105,8 @@ impl Plugin for TalosPlugin {
 
         // 这一行才是真正注册离屏捕获管线的地方（捕获相机、渲染目标、提取位姿等）。
         app.add_plugins(TalosCapturePlugin {
-            config: capture_config,
-            context: capture_context,
+            config: capture_config, // 捕获配置
+            context: capture_context, // 捕获上下文
         });
 
         // 订阅端可用时注册为资源；不可用（对端未起）时只发不收。

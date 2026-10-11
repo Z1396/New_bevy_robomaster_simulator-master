@@ -27,11 +27,11 @@ impl GameLayer {
         CollisionLayers::new(
             Self::Environment,
             [
-                Self::Default,
-                Self::VehicleSelf,
-                Self::VehicleOther,
-                Self::ProjectileSelf,
-                Self::ProjectileOther,
+                Self::Default,// 中立/未分类
+                Self::VehicleSelf,// 本机车身
+                Self::VehicleOther,// 敌方车身
+                Self::ProjectileSelf,// 本机子弹
+                Self::ProjectileOther,// 敌方子弹
             ],
         )
     }
@@ -136,10 +136,10 @@ pub struct PreciousCollision(
     pub  HashMap<
         String,
         (
-            ColliderConstructorHierarchy,
-            CollisionLayers,
-            Visibility,
-            Option<RigidBody>,
+            ColliderConstructorHierarchy, // 碰撞构造器
+            CollisionLayers, // 碰撞层
+            Visibility, // 可见性
+            Option<RigidBody>, // 可选刚体
         ),
     >,
 );

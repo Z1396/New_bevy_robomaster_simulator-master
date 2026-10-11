@@ -148,11 +148,11 @@ fn should_enable_talos_plugin(_app: &App) -> bool {
         .contains_resource::<crate::ros2::capture::RosCaptureContext>();
     #[cfg(not(feature = "ros2"))]
     let ros_capture_active = false;
-
+    // `DAEDALUS_FORCE_TALOS_CAPTURE=1` 环境变量：强制启用 talos 捕获通道。
     let force_talos_capture = std::env::var("DAEDALUS_FORCE_TALOS_CAPTURE")
         .map(|v| v == "1")
         .unwrap_or(false);
-
+    // 如果 ROS2 捕获通道已激活，或者强制启用 talos 捕获通道，就跳过 talos 插件。
     !ros_capture_active || force_talos_capture
 }
 

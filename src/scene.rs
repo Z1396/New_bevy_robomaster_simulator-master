@@ -50,27 +50,19 @@ use crate::setup::{
 };
 use crate::util::async_world::{AsyncWorld, AsyncWorldTask, drive_async_world};
 
-/// Resolves once Avian has built every collider `setup_collision` queued under `root`.
-///
-/// `setup_collision` puts a [`ColliderConstructorHierarchy`] on the named descendants of a world as
-/// soon as its instance is ready, so by the time this runs the queue for `root` is complete.
-/// Selecting and observing happen in one world job, so constructors finishing early are simply not
-/// selected rather than awaited forever.
-///
-/// 中文：等到 avian 把 `setup_collision` 排队给 `root` 下的碰撞体全部建好后才返回。
-/// 时机：`setup_collision` 在实例就绪的瞬间就给世界的指定后代挂上
-/// [`ColliderConstructorHierarchy`]（"请按这棵网格树生成碰撞体"），所以本函数运行到
-/// 这里时 `root` 下的"待建队列"已经填满。
+    /***这是给整个 GLTF 模型实体树批量自动生成碰撞体的组件**，专门处理带父子层级的模型（你的 RoboMaster 机器人模型，一堆子零件网格）。
+     旧名字叫 `AsyncSceneCollider`，Avian 改名后叫这个。 */
+/// [`ColliderConstructorHierarchy`]（"请按这棵网格树生成碰撞体"），所以本函数运行到这里时 `root` 下的"待建队列"已经填满。
 async fn colliders_ready(w: &AsyncWorld, root: Entity) {
     // `observe_all::<E, _>(select)`：对 `select` 闭包返回的每个实体挂一次性观察者，
-    // 全部触发 `E` 事件后才 resolve；这里 `E = ColliderConstructorHierarchyReady`
-    //（avian 建完一棵层次碰撞体后发的信号）。
+    // 全部触发 `E` 事件后才 resolve；这里 `E = ColliderConstructorHierarchyReady`(意思是建完一棵层次碰撞体后发的信号）。
     // 关键契约：**选择（select）与挂观察者发生在同一个 world job 内**——中间不会跑
     // 其他系统，所以不存在"观察者挂上去之前事件已经发过"的竞态；若某棵子树已先建好，
     // 它只是不在 `select` 结果里，而不会让本函数永远等下去。
     w.observe_all::<ColliderConstructorHierarchyReady, _>(move |world| {
-        // 把 `root` 的整棵子树实体收集进 `queued`。
+        // vec 存储待建碰撞体的队列
         let mut queued = Vec::new();
+        // 把 `root` 的整棵子树实体收集进 `queued`。
         collect_descendants(world, root, &mut queued);
         // 只保留"确实还挂着 ColliderConstructorHierarchy"的节点，即尚未完成的队列。
         queued.retain(|entity| world.get::<ColliderConstructorHierarchy>(*entity).is_some());
@@ -79,7 +71,6 @@ async fn colliders_ready(w: &AsyncWorld, root: Entity) {
     .await;
 }
 
-/// The instance id a loaded world spawned under, needed to enumerate its entities by name.
 /// 中文：取一个已加载世界对应的 InstanceId——后续要按"名字"枚举它的实体就得靠它。
 async fn instance_of(w: &AsyncWorld, root: Entity) -> InstanceId {
     // `with_world(闭包)`：把闭包作为"job"交给 AsyncWorld，在它持有 `&mut World` 时执行
@@ -135,6 +126,8 @@ async fn load_scene(w: AsyncWorld) {
     // 从世界里借出 `AssetServer` 再 `clone()`——它内部是 `Arc`，克隆很廉价；之所以要克隆，
     // 是因为后面 await 期间不能一直持有对世界的借用（见 async_world.rs 的说明）。
     let assets = w
+        //w.with_world(闭包)：把闭包作为"job"交给 AsyncWorld，在它持有 `&mut World` 时执行
+        // 并返回结果（同帧内 resolve，机制见 async_world.rs）。
         .with_world(|world| world.resource::<AssetServer>().clone())
         .await;
     // 小闭包：把资源路径变成"要加载的场景根"。`GltfAssetLabel::Scene(0)` 表示取 .glb 里的
@@ -144,22 +137,23 @@ async fn load_scene(w: AsyncWorld) {
 
     // 环境与机器人的碰撞分层由 GameLayer 统一给出（self/other/environment 三套）。
     let layers = GameLayer::environment_collision_layers();
-    // 闭包：构造"按整棵网格树生成三角形网格碰撞体"的指令（静态环境用，精度最高、最贵）。
+
     // `TrimeshFlags::all()` 打开全部生成选项。
     let trimesh = || {
+        // ColliderConstructorHierarchy表示按整棵网格树生成三角形网格碰撞体"的指令（静态环境用，精度最高、最贵）。
         ColliderConstructorHierarchy::new(ColliderConstructor::TrimeshFromMeshWithConfig(
             TrimeshFlags::all(),
         ))
-        .with_default_layers(layers)
+        .with_default_layers(layers) // with_default_layers 设置默认碰撞层为环境层
     };
     // `PreciousCollision` 的条目是四元组 (构造器, 碰撞层, 可见性, 可选刚体)：
     // 这里 = 三角网格碰撞体 + 环境层 + 可见 + 静态刚体（"钉死在地图上"）。
     let static_trimesh = || {
         (
-            trimesh(),
-            layers,
-            Visibility::Visible,
-            Some(RigidBody::Static),
+            trimesh(), // 三角网格碰撞体
+            layers, // 环境层
+            Visibility::Visible,// visible 可见性
+            Some(RigidBody::Static),// 静态刚体
         )
     };
 
@@ -168,21 +162,24 @@ async fn load_scene(w: AsyncWorld) {
     // `GroundRoot` 打地面标记；`Friction::new(0.5)` 是摩擦系数（无量纲）。
     let ground = w
         .spawn(scene("GROUND.glb"), (GroundRoot, Friction::new(0.5)))
-        .await;
+        .await; // .await 等待地面实体生成完成
     // 在地面里找 `DART_LAUNCH_DIRECTION` 节点打标签（飞镖发射位标记）。
+    // run 系统：在当前帧内执行一次，不等待异步任务完成。
     w.run(setup_dart_launch, ground).await;
     // 给地面下的 `GROUND_DENSE` 子节点生成静态三角网格碰撞体。
     w.run(
         setup_collision,
         (
             ground,
+            //PreciousCollision 碰撞组件：按名字指定的节点排队生成碰撞体。
+            // 这里给 `GROUND_DENSE` 子节点生成静态三角网格碰撞体。
             PreciousCollision(HashMap::from([(
-                "GROUND_DENSE".to_string(),
-                static_trimesh(),
+            "GROUND_DENSE".to_string(),
+            static_trimesh(),
             )])),
         ),
     )
-    .await;
+    .await; // .await 等待碰撞体生成完成
     // 等这些碰撞体真正建好，后续机器人才能可靠地落在地面上。
     colliders_ready(&w, ground).await;
 
@@ -222,7 +219,7 @@ async fn load_scene(w: AsyncWorld) {
         ),
     )
     .await;
-    colliders_ready(&w, tech_core).await;
+    colliders_ready(&w, tech_core).await;// 等待科技核心碰撞体生成完成
 
     // 能量机关（Power Rune）：静态刚体；`CollisionMargin(0.001)` = 0.001 m 碰撞余量
     //（越小越贴合、越不易"悬空"）；`Restitution::ZERO` 弹性为 0（打上去不反弹）。

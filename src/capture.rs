@@ -57,10 +57,13 @@ pub fn setup_capture_camera(world: &mut World) {
         let mut query = world.query_filtered::<Entity, With<CaptureCamera>>();
         query.iter(world).next().is_some()
     };
+    // 如果已存在离屏捕获相机，直接返回。
     if capture_camera_exists {
         return;
     }
-
+    // 从资源中获取渲染目标纹理句柄和垂直视场角。
+    // 这两个值在 setup.rs 中设置，这里直接从资源中取。.0 是解引用，获取组件数据。
+    // render_target_handle不是 C/C++ 那种裸指针，是 Bevy 的资源句柄 (Handle)，本质是一个带 ID 的 “引用标记”，不是内存地址指针。
     let render_target_handle = world.resource::<ImageHandle>().0.clone();
     let fov = world.resource::<CameraFov>().0;
     // MetalFX 是 macOS 专有的时空上采样；仅当编译目标为 macOS 且配置开启时才启用。
@@ -73,15 +76,20 @@ pub fn setup_capture_camera(world: &mut World) {
             frame_generation: config.render.metalfx_frame_generation,
         });
 
+    // 创建离屏捕获相机实体。
     let mut capture_camera = world.spawn((
         Camera3d::default(),
         Tonemapping::None, // 关闭色调映射：输出原始颜色给视觉算法，避免被"美化"
+        // .into() 把 Handle 转换为 Resource，Bevy 会自动管理内存。
         RenderTarget::Image(render_target_handle.into()), // 渲染到内存纹理而非窗口
         Camera {
+            // order：相机渲染顺序，值越小越先渲染。
+            // 这里取负值让捕获相机最先渲染，把本帧画面先写进离屏纹理，再轮到主相机（order 0）与预览相机（order 1）。
             order: CAPTURE_CAMERA_ORDER, // 渲染顺序，含义见常量注释
             // clear_color: ClearColorConfig::Custom(Color::BLACK),
             ..default()
         },
+        // 投影：透视投影，与主相机一致。
         Projection::Perspective(PerspectiveProjection {
             fov,          // 垂直视场角（弧度），与主相机一致才能画面/内参对齐
             near: 0.1,    // 近裁剪面（单位：米）
@@ -92,6 +100,9 @@ pub fn setup_capture_camera(world: &mut World) {
         DepthPrepass,  // 添加深度预渲染通道
         CaptureCamera, // 标记：本相机用于捕获
     ));
+    // 如果启用了 MetalFX，把组件插入相机。
+    // 这里按需插入，避免在非 macOS 平台编译时引入 MetalFX 相关代码。
+    // 这样可以保持代码的可移植性，只在需要时才引入 MetalFX 相关代码。
     if let Some(metalfx) = metalfx {
         capture_camera.insert(metalfx);
     }
@@ -110,19 +121,20 @@ pub struct PreviewImageNode;
 /// 同样幂等：相机与图片节点各自"不存在才创建"。
 pub fn setup_preview_window(world: &mut World) {
     let preview_enabled = world
-        .resource::<crate::config::SimulationConfig>()
-        .preview
-        .enabled;
+        .resource::<crate::config::SimulationConfig>().preview.enabled; 
+    // 如果预览功能未开启，直接返回。
     if !preview_enabled {
         return;
     }
-
+    // 从资源中获取渲染目标纹理句柄。
     let render_target_handle = world.resource::<ImageHandle>().0.clone();
+    // 如果已存在预览相机，直接返回。
     let preview_camera_exists = {
         let mut query = world.query_filtered::<Entity, With<PreviewCamera>>();
         query.iter(world).next().is_some()
     };
     if !preview_camera_exists {
+        // 创建预览相机实体。
         world.spawn((
             Camera2d::default(),
             Camera {
@@ -132,12 +144,13 @@ pub fn setup_preview_window(world: &mut World) {
             PreviewCamera,
         ));
     }
-
+    // 如果已存在预览图片节点，直接返回。
     let preview_node_exists = {
         let mut query = world.query_filtered::<Entity, With<PreviewImageNode>>();
         query.iter(world).next().is_some()
     };
     if !preview_node_exists {
+        // 创建预览图片节点实体。
         world.spawn((
             Node {
                 width: Val::Percent(100.0),  // 铺满父节点宽度
@@ -148,7 +161,7 @@ pub fn setup_preview_window(world: &mut World) {
             // 中文：作为背景渲染，左上角帮助文字 UI 仍覆盖在其上方。
             GlobalZIndex(-1), // z 序置底，确保不遮挡其它 UI
             ImageNode::new(render_target_handle), // 用捕获纹理作为 2D 图片显示
-            PreviewImageNode,
+            PreviewImageNode, // 标记：本节点用于预览
         ));
     }
 }

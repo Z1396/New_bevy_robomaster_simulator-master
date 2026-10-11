@@ -6,8 +6,8 @@ present_mode = "auto_no_vsync" # 渲染呈现模式；auto_no_vsync关闭垂直�
 # 可选值：auto_vsync(开启vsync锁60帧)、auto_no_vsync(关闭vsync)、fifo/fifo_relaxed/mailbox/immediate（Vulkan底层呈现模式）
 
 [debug]
-egui = true        # 开启Egui调试UI界面，开启会大幅掉帧，默认关闭
-inspector = true   # Bevy实体检视器，查看场景物体组件，耗性能，关闭
+egui = false        # 开启Egui调试UI界面，开启会大幅掉帧，默认关闭
+inspector = false   # Bevy实体检视器，查看场景物体组件，耗性能，关闭
 diagnostics = true  # 控制台输出FPS、帧耗时等性能诊断信息（你日志里bevy_diagnostic就是这个输出）
 
 [preview]

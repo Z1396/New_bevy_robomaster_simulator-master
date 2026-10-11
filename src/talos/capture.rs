@@ -226,7 +226,7 @@ pub struct TalosCaptureContext {
 /// 捕获插件：把通用捕获管线（`CaptureBundle`）接上 Talos 的回调与调度。
 pub struct TalosCapturePlugin {
     pub config: CaptureConfig,// 捕获配置
-       pub context: TalosCaptureContext,// 捕获上下文
+    pub context: TalosCaptureContext,// 捕获上下文
 }
 
 /// 把"自瞄订阅开关"作为运行状态发给对端（告知视觉程序当前是否在接收其指令）。

@@ -301,11 +301,6 @@ pub fn setup_vehicle(
     }
 }
 
-/// Queues Avian collider construction for the named nodes of a loaded world.
-/// 给一个已加载世界里"按名字指定"的节点排队生成 avian 碰撞体。
-///
-/// The map is passed in rather than parked on the entity as a component: it is an instruction for
-/// one moment in the load, not state the world should keep.
 /// （中译：map 作为参数传入而没挂成组件——它只是"加载这一瞬间的指令"，不是世界需要长期保留的状态。）
 pub fn setup_collision(
     // `In<(Entity, PreciousCollision)>`：一次性系统的输入是一个元组（根实体 + 名称→构造表）。
