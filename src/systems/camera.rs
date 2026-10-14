@@ -1,11 +1,12 @@
 //! 相机控制与跟随：三种模式（第一人称 Robot / 第三人称 / 自由），以及自由相机操作。
-//!
-//! - `following_controls`：Tab 循环切换三种模式（在 Input 阶段）。
-//! - `update_camera_follow`：按当前模式把主相机摆到目标位置（在 Camera 阶段，晚于游戏逻辑）。
-//! - `freecam_controls`：自由模式下用鼠标 + WASD/NJ 移动相机。
-//!
-//! 第一人称模式复用 glTF 的 `CAM_DIRECTION` / `SHOT_DIRECTION` 节点契约（见 setup.rs），
-//! 且与 systems/projectile.rs 的弹道方向使用**同一套旋转合成**，保证"准星指哪打哪"。
+/// 相机控制系统：三种模式（第一人称 Robot / 第三人称 / 自由），以及自由相机操作。
+///
+/// - `following_controls`：Tab 循环切换三种模式（在 Input 阶段）。
+/// - `update_camera_follow`：按当前模式把主相机摆到目标位置（在 Camera 阶段，晚于游戏逻辑）。
+/// - `freecam_controls`：自由模式下用鼠标 + WASD/NJ 移动相机。
+///
+/// 第一人称模式复用 glTF 的 `CAM_DIRECTION` / `SHOT_DIRECTION` 节点契约（见 setup.rs），
+/// 且与 systems/projectile.rs 的弹道方向使用**同一套旋转合成**，保证"准星指哪打哪"。
 
 use bevy::input::mouse::MouseMotion;
 use bevy::prelude::*;
@@ -33,18 +34,27 @@ pub fn following_controls(mut mode: ResMut<CameraMode>, controller: Res<Controll
 
 /// 按当前相机模式摆正主相机（Camera 阶段）。
 pub fn update_camera_follow(
-    // `Without<Controlled>`：主相机不挂在任何被操控的车上，避免与车实体混淆。
-    camera_query: Single<(&mut Transform, &MainCamera), Without<Controlled>>,
-    infantry: Single<&Transform, (With<Infantry>, With<Controlled>)>,  //
-    gimbal: Single<&Transform, (With<Controlled>, With<InfantryGimbal>)>,
-    view_offset: Single<&Transform, (With<Controlled>, With<InfantryViewOffset>)>,
-    launch_offset: Single<&Transform, (With<Controlled>, With<InfantryLaunchOffset>)>,
-    mode: Res<CameraMode>,
+    
+    camera_query: Single<(&mut Transform, &MainCamera), Without<Controlled>>,// `Without<Controlled>`：主相机不挂在任何被操控的车上，避免与车实体混淆。
+    
+    infantry: Single<&Transform, (With<Infantry>, With<Controlled>)>, // 从 Bevy 获取被操控的车实体的变换组件，用于计算相机位置 
+    gimbal: Single<&Transform, (With<Controlled>, With<InfantryGimbal>)>, // 从 Bevy 获取被操控的车实体的云台实体的变换组件，用于计算相机旋转
+    view_offset: Single<&Transform, (With<Controlled>, With<InfantryViewOffset>)>, // 从 Bevy 获取被操控的车实体的 CAM_DIRECTION 节点的变换组件，用于计算相机位置
+    launch_offset: Single<&Transform, (With<Controlled>, With<InfantryLaunchOffset>)>,// 从 Bevy 获取被操控的车实体的炮口实体的变换组件，用于计算相机旋转
+    mode: Res<CameraMode>, // 从 Bevy 获取当前相机模式组件，用于判断相机模式
 ) {
     // `into_inner()`：把 Single 解包成里面的元组/引用，避免反复解引用。
     let gimbal_transform = gimbal.into_inner();
+    // camera_query 是 Single 类型，所以直接解包查询主相机的变换组件和相机模式组件的引用
     let (mut camera_transform, camera_offset) = camera_query.into_inner();
 
+    /*ROS2 的习惯：
+    > ROS2（REP103 机器人标准）：**X 向前，Y 向左，Z 向上**
+    > 右手手势：食指 = X (前)，中指 = Y (左)，大拇指 = Z (上)，就是你说的那个手势
+
+    Bevy：
+    > Bevy 世界：**X 向右，Y 向上，+Z 指向自己（朝屏幕外），相机看向 -Z**
+    > 右手手势：大拇指 = X (右)，食指 = Y (上)，中指 = Z (朝你) */
     match mode.0 {
         FollowingType::Robot => {
             // 第一人称：相机放在 CAM_DIRECTION 节点处，朝向与炮口方向合成一致。
@@ -54,18 +64,22 @@ pub fn update_camera_follow(
             // CAM_DIRECTION 在云台坐标系里的局部偏移，旋转到世界方向。
             let view_offset_world = gimbal_world_rotation * view_offset_transform.translation;
 
-            camera_transform.translation = infantry.translation + view_offset_world;
+            // 相机位置 = 车世界位置 + CAM_DIRECTION 世界偏移。
+            camera_transform.translation = infantry.translation + view_offset_world + Vec3::from([0.0, 0.0, 0.0]);
             // 朝向 = 云台世界旋转 × 炮口局部旋转 × Rz(90°)（Bevy 相机朝 -Z，需要这个修正）。
             camera_transform.rotation = (gimbal_world_rotation
                 * launch_offset.rotation
-                * Quat::from_euler(EulerRot::ZYX, 0.0, 0.0, PI / 2.0))
-            .normalize()
+                * Quat::from_euler(EulerRot::ZYX, 0.0, 0.0, PI / 4.0))
+            .normalize() // 确保旋转矩阵是正交的，避免旋转矩阵的不稳定性
         }
         FollowingType::ThirdPerson => {
             // 第三人称：在车后上方固定偏移处，回头看向车（`Vec3::Y` 指定世界上方）。
             let base_transform = infantry.into_inner();
+            // 相机位置 = 车世界位置 + 固定偏移。
             let offset = base_transform.rotation * camera_offset.follow_offset;
+            // 相机位置 = 车世界位置 + 固定偏移。
             camera_transform.translation = base_transform.translation + offset;
+            // 相机看向车（`Vec3::Y` 指定世界上方）。
             camera_transform.look_at(base_transform.translation, Vec3::Y);
         }
         FollowingType::Free => {} // 自由模式由 freecam_controls 接管，这里不动
@@ -74,35 +88,39 @@ pub fn update_camera_follow(
 
 /// 自由相机：鼠标看向 + 键盘平移（仅在 Free 模式运行）。
 pub fn freecam_controls(
-    time: Res<Time>,    
-    mode: Res<CameraMode>,
-    config: Res<SimulationConfig>,
+    time: Res<Time>,     // 从 Bevy 获取当前时间，用于计算 dt
+    mode: Res<CameraMode>, // 从 Bevy 获取当前相机模式，用于判断是否为自由模式
+    config: Res<SimulationConfig>, // 从 Bevy 获取模拟配置，用于获取相机移动速度
     // `MessageReader<T>`：读取消息流（消息 vs 事件的差别见 controller.rs 中 MessageWriter 的说明）。
-    mut mouse_motion_events: MessageReader<MouseMotion>,
-    keyboard: Res<ButtonInput<KeyCode>>,
-    camera_query: Single<&mut Transform, (With<MainCamera>, Without<Infantry>)>,
+    mut mouse_motion_events: MessageReader<MouseMotion>, // 从 Bevy 获取鼠标移动事件，用于计算相机旋转
+    keyboard: Res<ButtonInput<KeyCode>>, // 从 Bevy 获取键盘输入，用于平移相机
+    camera_query: Single<&mut Transform, (With<MainCamera>, Without<Infantry>)>, // 从 Bevy 获取主相机的变换组件，用于更新相机位置
 ) {
     if mode.0 != FollowingType::Free {
         return;
     }
 
+    // 计算本帧时间间隔（dt），用于平滑移动
     let delta = time.delta_secs();
+    // 从 Bevy 获取主相机的变换组件，用于更新相机位置，into_inner获取相机的transform可变引用，避免重复解引用
     let mut camera_transform = camera_query.into_inner();
 
     // 汇总本帧所有鼠标位移（一帧可能收到多段 MouseMotion）。
     let mut mouse_delta = Vec2::ZERO;
+    // 遍历鼠标移动事件，累加鼠标位移，用于计算相机旋转
     for event in mouse_motion_events.read() {
+        // delta表示上一帧到当前帧的鼠标位移
         mouse_delta += event.delta;
     }
 
     if mouse_delta != Vec2::ZERO {
         // 把当前旋转拆成 yaw/pitch/roll（YXZ 顺序），只改 yaw/pitch 再合回去。
         let (yaw, pitch, roll) = camera_transform.rotation.to_euler(EulerRot::YXZ);
-
+        // 计算新的 yaw/pitch 旋转角度
         let new_yaw = yaw - mouse_delta.x * config.camera.mouse_sensitivity;
         // pitch 限制在 ±1.4 rad（约 ±80°），防止视角翻转。
         let new_pitch = (pitch - mouse_delta.y * config.camera.mouse_sensitivity).clamp(-1.4, 1.4);
-
+        // 更新相机旋转（合并新的 yaw/pitch 旋转角度和当前 roll 角度，保持相机朝向不变）
         camera_transform.rotation = Quat::from_euler(EulerRot::YXZ, new_yaw, new_pitch, roll);
     }
 
@@ -126,9 +144,12 @@ pub fn freecam_controls(
         camera_transform.translation += right * speed;
     }
     if keyboard.pressed(KeyCode::KeyN) {
+        // 提升相机位置
+        // 添加相机提升功能，并使用时间间隔平滑移动
         camera_transform.translation += up * speed;
     }
     if keyboard.pressed(KeyCode::KeyJ) {
+        // 下降相机位置
         camera_transform.translation -= up * speed;
     }
 }

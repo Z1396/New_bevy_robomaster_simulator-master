@@ -63,7 +63,6 @@ pub struct InfantryLaunchOffset;
 #[derive(Component)]
 pub struct SlapperInfantry;
 
-/// Marker for the currently active (controlled) SlapperInfantry
 /// 中文：当前被选中的那台"可操控 AI 车"标记——有它才响应玩家输入，由
 /// `switch_slapper_control` 在 Tab 切换时运行时补挂/摘除。
 #[derive(Component)]

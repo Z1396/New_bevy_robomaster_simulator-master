@@ -70,14 +70,14 @@ pub fn update_chassis_observation(
     mut previous: ResMut<PreviousKinematicState>,// 上一帧的运动学状态，用于差分求加速度
     // 查询所有受控制的兵，确保只处理当前帧的观测。
     chassis: Query<
-        (&GlobalTransform, &LinearVelocity, &AngularVelocity),
-        (With<Infantry>, With<Controlled>),
+        (&GlobalTransform, &LinearVelocity, &AngularVelocity),  // 车身位姿、线速度、角速度
+        (With<Infantry>, With<Controlled>),// 只查询受控制的兵
     >,
 ) {
     // 车辆不存在（0 或多个）：发布全零帧并重置差分历史。
     let Ok((chassis_tf, linear_velocity, angular_velocity)) = chassis.single() else {
-        *frame = ChassisObservationFrame::default();
-        *previous = PreviousKinematicState::default();
+        *frame = ChassisObservationFrame::default();    // 发布全零帧（车辆不存在时作为"空观测"发布）
+        *previous = PreviousKinematicState::default();  // 重置差分历史（车辆不存在时）
         return;
     };
     // 计算当前帧的时间戳和间隔
@@ -109,16 +109,16 @@ pub fn update_chassis_observation(
         wheel_linear_to_angular(wheel_linear_mps, config.mecanum.wheel_radius_m);
     // 存储当前帧的观测
     *frame = ChassisObservationFrame {
-        stamp_s,
-        dt_s,
-        v_body,
-        wz_radps,
-        wheel_linear_mps,
-        wheel_angular_radps,
-        a_body,
-        alpha_z_radps2,
-        rpy_rad: Vec3::new(roll, pitch, yaw),
-        gyro_xyz_radps: gyro_body,
+        stamp_s,     // 采样时刻（秒）
+        dt_s,        // 距上一帧的间隔（秒）    
+        v_body,       // 机身系线速度 (x=前, y=左)，单位 m/s
+        wz_radps,    // 偏航率（rad/s）
+        wheel_linear_mps, // 四轮线速度（单位 m/s）
+        wheel_angular_radps, // 四轮角速度（单位 rad/s）
+        a_body,             // 机身系线加速度 (x=前, y=左)，单位 m/s²
+        alpha_z_radps2,     // 偏航角加速度（rad/s²）
+        rpy_rad: Vec3::new(roll, pitch, yaw), // 机体系横滚/俯仰/偏航（rad）
+        gyro_xyz_radps: gyro_body, // 机体系陀螺仪速度（rad/s）
         accel_xyz_mps2: Vec3::new(a_body.x, a_body.y, 0.0), // 平面运动，Z 向加速度记 0
     };
 

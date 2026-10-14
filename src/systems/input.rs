@@ -280,8 +280,14 @@ pub fn switch_slapper_control(
         return;
     }
 
-    // 收集所有可选车的实体（有 Infantry + SlapperInfantry 组件）
-    let roots: Vec<Entity> = slapper_roots.iter().collect();
+    // 收集所有可选车的实体（有 Infantry + SlapperInfantry 组件），并按 Entity id 排序。
+    // 【修改】这个 sort 是必需的：ActiveSlapper 每搬一次家、组件挂/摘都会让实体更换
+    // archetype，而 Bevy 的查询是「按 archetype 分组枚举」的 —— `roots` 的顺序因此会变。
+    // 实测日志中顺序在 [1247,1227,1966] 与 [1966,1227,1247] 之间来回翻转，且"当前车"
+    // 总落在末尾，导致 next_idx 恒为 0，Tab 只在两辆车间循环、第三辆永远轮不到。
+    // Entity id 随生成顺序单调递增且本项目这三台车永不 despawn，排序后顺序恒定。
+    let mut roots: Vec<Entity> = slapper_roots.iter().collect();
+    roots.sort_unstable();  // ← 新增：把顺序钉死,按 Entity id 从小到大快速排序
     // 只有一台可切换车时无意义
     if roots.len() <= 1 {
         return; 
@@ -297,13 +303,6 @@ pub fn switch_slapper_control(
         Some(idx) => (idx + 1) % roots.len(),
         None => 0,
     };
-
-    // 【调试】打印本次 Tab 切换时的可选车顺序与下标，用于验证 roots 顺序是否稳定。
-    // 验证完即可删除本行。
-    info!(
-        "tab-switch: roots={:?} current={:?} current_idx={:?} next_idx={}",
-        roots, current, current_idx, next_idx
-    );
 
     // （根实体 + 全部后代都要摘，见上方文档说明。）
     if let Some(current_root) = current {

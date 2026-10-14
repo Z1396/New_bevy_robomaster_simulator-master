@@ -38,7 +38,7 @@ pub struct TalosSubscriberRes(pub Arc<Mutex<TalosIpcSubscriber>>);
 // Newtype（单字段包装）模式：`Deref/DerefMut` 派生让 `TalosEnabled` 直接透传
 // 内部 `AtomicBool` 的方法（如 `.load()`），无需写 `.0.load()`。
 #[derive(Resource, Deref, DerefMut)]
-pub struct TalosEnabled(pub AtomicBool);
+pub struct TalosEnabled(pub AtomicBool);// 原子布尔值，用于控制是否接收视觉程序的自瞄指令。
 
 /// 捕获插件配置：分辨率与视场角（fov）。
 pub struct TalosPluginConfig {
@@ -75,23 +75,25 @@ impl Plugin for TalosPlugin {
         // 网络转发或原共享内存，两种模式走同一个分发封装，下游系统代码无需感知。
         // `match` 解构 Result：失败就记错误日志并 `return`（插件装配中止，但不 panic）。
         let ipc = match TalosIpc::new() {
+            // ok 成功成功返回 IPC 实例，失败返回错误。
             Ok(ipc) => ipc,
+            // err 错误返回错误信息，插件装配中止。
             Err(e) => {
                 error!("cannot create talos ipc: {}", e);
                 return;
             }
         };
 
-        // 把发布端塞进 `Arc<Mutex<...>>`：捕获系统、心跳系统、真值系统都要用，
-        // 用共享所有权 + 互斥锁保证同一时刻只有一个线程发数据。
+        // 把发布端塞进 `Arc<Mutex<...>>`：捕获系统、心跳系统、真值系统都要用，Mutex 用共享所有权 + 互斥锁保证同一时刻只有一个线程发数据。
+        // Arc::new()：创建一个新 Arc(Arc是智能指针，用于跨线程共享所有权的)，初始引用计数为 1。
         let publisher = Arc::new(Mutex::new(ipc.publisher));
 
         // 图像格式走 RGB8（3 通道），分辨率取自插件配置。
         let capture_config = CaptureConfig {
-            width: self.config.width,
-            height: self.config.height,
-            texture_format: self.config.texture_format,
-            frame_kind: CapturedFrameKind::Rgb8,
+            width: self.config.width,  // 离屏捕获宽度
+            height: self.config.height, // 离屏捕获高度
+            texture_format: self.config.texture_format, // 纹理像素格式（Rgba8UnormSrgb: 离屏捕获）
+            frame_kind: CapturedFrameKind::Rgb8, // 离屏捕获帧格式（Rgb8: 离屏捕获）
         };
 
         // 捕获上下文：发布端句柄 + 视场角（弧度），随捕获插件一起注入。
@@ -109,9 +111,13 @@ impl Plugin for TalosPlugin {
             context: capture_context, // 捕获上下文
         });
 
-        // 订阅端可用时注册为资源；不可用（对端未起）时只发不收。
+        // 订阅端可用时注册为资源；不可用（对端未起）时只发不收。some() 检查是否为 Some。
+        // `ipc.subscriber` 是 `Option<TalosIpcSubscriber>`，`if let Some(subscriber) = ipc.subscriber` 检查是否为 Some。
         if let Some(subscriber) = ipc.subscriber {
+            // 如果订阅端可用，注册为资源。并打印日志。
+            // `info!("talos subscriber ready")`：打印日志，提示订阅端已就绪。
             info!("talos subscriber ready");
+            // TalosSubscriberRes 是订阅端资源，用于在系统中访问订阅端。
             app.insert_resource(TalosSubscriberRes(Arc::new(Mutex::new(subscriber))));
         } else {
             info!("talos subscriber not available");
@@ -133,6 +139,7 @@ impl Plugin for TalosPlugin {
         // 真值又排在运行状态之后，形成 advance → runtime_state → ground_truth 的链。
         app.add_systems(
             Last,//Last 阶段(表示每帧最末阶段)。
+            // ground_truth_system 是发布真值的系统，单位 ns。
             crate::talos::ground_truth::publish_ground_truth_system
                 .after(publish_talos_runtime_state_system),
         );
@@ -177,7 +184,7 @@ fn process_subscription(
     let Some(cmd) = recv_gimbal_cmd(&ctx) else {
         return;
     };
-    // No solution from the solver: drop the target so the PID loop stops driving.
+
     // `distance_m == -1.0` 是解算器"No solution"的哨兵值（单位米）：
     // 移除跟踪目标，让 PID 云台闭环停下（见 main.rs 里 gimbal_pid_controls 的门控）。
     if cmd.distance_m == -1.0 {

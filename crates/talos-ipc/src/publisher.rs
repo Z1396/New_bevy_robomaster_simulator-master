@@ -220,6 +220,7 @@ impl ShmPublisher {
     /// 写相机内参（低频，直接整块覆盖，无需三缓冲）。单位：像素。
     pub fn set_camera_info(&mut self, info: CameraInfo) {
         unsafe {
+            // 直接整块覆盖，无需三缓冲。as_mut() 取可变引用，直接修改内存。
             let meta = self.meta_region.as_mut::<ShmMetaRegion>();
             meta.camera_info = info;
         }

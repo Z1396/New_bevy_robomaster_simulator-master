@@ -12,7 +12,7 @@ use crate::triple_buffer::TripleBufferConsumer;
 pub struct ShmSubscriber {
     meta_region: ShmRegion,
 }
-
+// 实现 `ShmSubscriber` 的方法。
 impl ShmSubscriber {
     /// 打开已存在的元数据共享内存并校验魔数/版本；不匹配则返回错误。
     pub fn connect() -> Result<Self, ShmError> {

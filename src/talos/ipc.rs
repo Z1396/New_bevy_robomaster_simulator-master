@@ -43,13 +43,12 @@ enum IpcMode {
 fn ipc_mode() -> IpcMode {
     // 三步串成一条链：`var` 读环境变量（Result，未设置时为 Err）→
     // std::env::var("TALOS_IPC")表示读取环境变量 TALOS_IPC的值
-    // `unwrap_or_default` 把 Err 变成空字符串 ""→ `to_ascii_lowercase` 统一小写 →
-    // `as_str` 转成 &str 供 match 比较（match 的分支是字符串字面量）。
     match std::env::var("TALOS_IPC")
-        .unwrap_or_default()
-        .to_ascii_lowercase()
-        .as_str()
+        .unwrap_or_default()// `unwrap_or_default` 把 Err 变成空字符串 ""→ 
+        .to_ascii_lowercase()// `to_ascii_lowercase` 统一小写，确保比较时不区分大小写。
+        .as_str()// `as_str` 转成 &str 供 match 比较（match 的分支是字符串字面量）。
     {
+        // 只有恰好为 "shm" 才走共享内存，其余（含未设置）一律网络。
         "shm" => IpcMode::Shm,
         _ => IpcMode::Net, // 默认 net
     }

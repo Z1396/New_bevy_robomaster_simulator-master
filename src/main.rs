@@ -147,10 +147,14 @@ fn should_enable_talos_plugin(_app: &App) -> bool {
         .world()
         .contains_resource::<crate::ros2::capture::RosCaptureContext>();
     #[cfg(not(feature = "ros2"))]
+    // ros_capture_active 为 false，确保 talos 插件被启用。
+    // 因为 ros2 捕获通道未激活，所以 talos 插件会占用离屏相机渲染。
     let ros_capture_active = false;
-    // `DAEDALUS_FORCE_TALOS_CAPTURE=1` 环境变量：强制启用 talos 捕获通道。
+    // `DAEDALUS_FORCE_TALOS_CAPTURE=1` 环境变量：强制启用 talos 捕获通道。std::env::var表示读环境变量。
     let force_talos_capture = std::env::var("DAEDALUS_FORCE_TALOS_CAPTURE")
+        // `map(|v| v == "1")`：如果环境变量存在且值为 "1"，就返回 true；否则返回 false。
         .map(|v| v == "1")
+        // `unwrap_or(false)`：如果环境变量不存在或值不是 "1"，就返回 false。
         .unwrap_or(false);
     // 如果 ROS2 捕获通道已激活，或者强制启用 talos 捕获通道，就跳过 talos 插件。
     !ros_capture_active || force_talos_capture
@@ -306,52 +310,53 @@ fn main() {
                 .in_set(GameplaySystems::GameLogic),
 
                 //Camera phase —— 相机在游戏逻辑算完后才跟随，保证跟的是本帧结果
-                // (
-                //     freecam_controls.run_if(|mode: Res<CameraMode>| mode.0 == FollowingType::Free), // 自由相机模式
-                //     // 第一人称/第三人称相机模式
-                //     systems::update_camera_follow
-                //         .run_if(|mode: Res<CameraMode>| mode.0 != FollowingType::Free),
-                // )
-                // .in_set(GameplaySystems::Camera)
-                // // 再早于渲染阶段，确保渲染用的是移动后的相机。
-                // .before(RenderSystems::Render),
-
+                (   //mode.0 表示提取 CameraMode 组件的第一个字段，即相机自由观察模式(Free)
+                    freecam_controls.run_if(|mode: Res<CameraMode>| mode.0 == FollowingType::Free), // 自由相机模式
+                    // 第一人称/第三人称相机模式
+                    systems::update_camera_follow
+                        .run_if(|mode: Res<CameraMode>| mode.0 != FollowingType::Free),
+                )
+                .in_set(GameplaySystems::Camera)
+                // 再早于渲染阶段，确保渲染用的是移动后的相机。
+                .before(RenderSystems::Render),
 
                 // Cleanup phase —— 帧末清理：到期子弹销毁、F2 截图等
-                // (
-                //     // 巡检所有子弹的寿命计时器，到期的 despawn（销毁实体）
-                //     cleanup_projectiles,
-                //     // F2 触发一次截图（`.run_if` 里读的是"刚按下"这一瞬间）
-                //     screenshot_on_f2
-                //         .run_if(|input: Res<ButtonInput<KeyCode>>| input.just_pressed(KeyCode::F2)),
-                //     // 截图保存期间给窗口转圈光标
-                //     screenshot_saving,
-                // )
-                //     .in_set(GameplaySystems::Cleanup),
+                (
+                    // 巡检所有子弹的寿命计时器，到期的 despawn（销毁实体）
+                    cleanup_projectiles,
+                    // F2 触发一次截图（`.run_if` 里读的是"刚按下"这一瞬间）
+                    screenshot_on_f2
+                        .run_if(|input: Res<ButtonInput<KeyCode>>| input.just_pressed(KeyCode::F2)),
+                    // 截图保存期间给窗口转圈光标
+                    screenshot_saving,
+                )
+                .in_set(GameplaySystems::Cleanup),
             ),
         )
         // PostUpdate = 渲染前的收尾阶段。发射子弹（车/飞镖/UAV）放在这里，
         // 且 `.after(TransformSystems::Propagate)`：必须等 Bevy 把本帧的父子变换
         // 累积计算完（世界矩阵更新），才能拿到炮口的最新世界位置/朝向，否则会
-        // 用上一帧的旧位置生成子弹。
-        // .add_systems(
-        //     PostUpdate, // 渲染前的收尾阶段紧跟在 Update 之后的一个阶段
-        //     // 更新战车位姿（包括云台）
-        //     // 必须在渲染前，确保渲染用的是最新位姿。TransformSystems::Propagate表示等待所有变换更新完成。
-        //     update_chassis_observation.after(TransformSystems::Propagate),
-        // )
-        // .add_systems(
-        //     PostUpdate,
-        //     projectile_launch
-        //         .after(TransformSystems::Propagate)
-        //         .run_if(controller_shoot_pressed),// run_if：只在按下射击键时发射子弹
-        // )
-        // .add_systems(
-        //     PostUpdate,
-        //     dart_launch
-        //         .after(TransformSystems::Propagate)
-        //         .run_if(controller_dart_just_pressed),// run_if：只在按下飞镖键时发射飞镖
-        // )
+        // 用上一帧的旧位置生成子弹。(原因：Bevy 是异步渲染，先渲染，再更新变换，导致渲染用的是旧变换)
+        .add_systems(
+            PostUpdate, // 渲染前的收尾阶段紧跟在 Update 之后的一个阶段
+            // 更新战车位姿（包括云台）
+            // 必须在渲染前，确保渲染用的是最新位姿。TransformSystems::Propagate表示等待所有变换更新完成。
+            update_chassis_observation.after(TransformSystems::Propagate),
+        )
+        // 发射子弹（车/飞镖/UAV）
+        .add_systems(
+            PostUpdate,
+            projectile_launch
+                .after(TransformSystems::Propagate)
+                .run_if(controller_shoot_pressed),// run_if：只在按下射击键时发射子弹
+        )
+        // 发射飞镖（UAV）
+        .add_systems(
+            PostUpdate,
+            dart_launch
+                .after(TransformSystems::Propagate)
+                .run_if(controller_dart_just_pressed),// run_if：只在按下飞镖键时发射飞镖
+        )
         // // 无人机检测模块：UAV_LAUNCH_DIRECTION（默认 p 键）
         // .add_systems(PostUpdate, uav_launch.after(TransformSystems::Propagate))
         //FixedUpdate：固定频率调度（默认随物理 120Hz），空气阻力按固定步长计算更稳定。

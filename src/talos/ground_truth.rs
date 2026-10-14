@@ -158,7 +158,6 @@ pub fn publish_ground_truth_system(
         }
     }
 
-    // Collect rune ground truth
     for (global_tf, local_tf, power_rune, mechanism, rotation) in rune_query.iter() {
         // 超过上限直接结束（与战车不同：这里用 break 跳出整个循环）。
         if (batch.rune_count as usize) >= GROUND_TRUTH_MAX_RUNES {
@@ -167,10 +166,6 @@ pub fn publish_ground_truth_system(
 
         // 机关中心世界位置，单位米（ROS 系）。
         let pos_ros = to_ros_vec3(global_tf.translation());
-
-        // Extract current rotation angle around the actual rune axis (-1, 0, -1).
-        // The rune rotates via `rotate_local_axis(direction, angle)`, so we must
-        // project the quaternion back onto that axis — not extract an Euler X angle.
         // 机关绕固定轴 (-1, 0, -1) 转（见 rotation.rs），所以必须把四元数投影回该轴，
         // 得到带符号的总转角，而不能简单取某个欧拉角分量。
         let rune_axis = Dir3::from_xyz(-1.0, 0.0, -1.0).unwrap();

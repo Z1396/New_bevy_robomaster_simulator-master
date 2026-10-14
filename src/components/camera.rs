@@ -18,11 +18,10 @@ pub struct MainCamera {
 }
 
 /// 当前相机模式（全局资源）。
-///
 /// `Deref`/`DerefMut`：为单字段新类型自动实现"解引用到内部字段"，于是 `*mode` 与
 /// `mode.0` 可互换地直接拿到 `FollowingType`，不必每次写 `.0`。
 #[derive(Resource, PartialEq, Deref, DerefMut)]
-pub struct CameraMode(pub FollowingType);
+pub struct CameraMode(pub FollowingType);// 当前相机模式，全局资源，用于控制相机跟随方式。
 
 impl Default for CameraMode {
     fn default() -> Self {
@@ -36,7 +35,7 @@ impl Default for CameraMode {
 /// 用 `AtomicBool` 而非普通 `bool`：talos/ROS2 的独立线程也会读取它，原子类型保证
 /// 跨线程读写不产生数据竞争；`Deref`/`DerefMut` 让 `flag.load/store` 可直接调用。
 #[derive(Resource, Deref, DerefMut)]
-pub struct SubscribeAutoAim(pub AtomicBool);
+pub struct SubscribeAutoAim(pub AtomicBool);// 自瞄订阅开关，用于控制是否接收视觉程序的自瞄指令。
 
 /// 相机跟随模式三态。`Copy` + `PartialEq`：可被廉价拷贝、可直接比较
 ///（main.rs 里用 `mode.0 != FollowingType::Free` 之类的条件决定系统是否运行）。

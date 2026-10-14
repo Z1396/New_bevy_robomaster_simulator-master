@@ -256,12 +256,14 @@ pub fn publish_talos_runtime_state_system(
 }
 
 impl Plugin for TalosCapturePlugin {
+    // `Plugin::build()` 是在 `App::add_plugin(plugin)` 的时候直接同步执行，发生在游戏启动、所有 Schedule（Startup/Update）运行之前！
     fn build(&self, app: &mut App) {
         // 建通用捕获管线（离屏相机 + 渲染目标 + GPU 回读），并挂上 Talos 的回调
         // （`GpuCaptureHandler` 盒装成 trait 对象放进 Vec，插件管线性地不关心具体实现）。
         let capture = CaptureBundle::color(
-            app,
-            self.config.clone(),
+            app, // 应用实例
+            self.config.clone(), // 捕获配置
+            // 捕获回调函数向量：仅包含 TalosSnapshotCreator，其他插件管线性地不关心具体实现。
             vec![Box::new(TalosSnapshotCreator::default())],
         );
         // 取出渲染目标纹理句柄（`color_target()` 返回 Option，`.unwrap()` 表示这里必须成功）。
@@ -272,11 +274,11 @@ impl Plugin for TalosCapturePlugin {
             let mut publisher = self.context.publisher.lock().unwrap();
             // 由分辨率 + 垂直 fov 推出焦距 fx/fy 与主点 cx/cy（单位像素）。
             let intrinsics = compute_camera_intrinsics(
-                self.config.width,
-                self.config.height,
-                self.context.fov_y,
+                self.config.width, // 彩色渲染目标宽度
+                self.config.height, // 彩色渲染目标高度
+                self.context.fov_y, // fov_y 视场角（弧度）
             );
-
+            // 发布相机内参。
             publisher.set_camera_info(CameraInfo {
                 timestamp_ns: now_ns(),
                 fx: intrinsics.fx,
@@ -295,11 +297,12 @@ impl Plugin for TalosCapturePlugin {
         // - Update：`sync_capture_camera` 把捕获相机对齐到当前视角，排在相机跟随之后、
         //   渲染之前（保证渲染用的是本帧最新视角）。
         app.add_plugins(capture)
-            .insert_resource(ImageHandle(render_target_handle))
-            .insert_resource(CameraFov(self.context.fov_y))
-            .insert_resource(self.context.clone())
-            .add_systems(Startup, setup_capture_camera)
-            .add_systems(Startup, setup_preview_window)
+            .insert_resource(ImageHandle(render_target_handle))// 离屏相机渲染目标纹理句柄
+            .insert_resource(CameraFov(self.context.fov_y))// fov_y 视场角（弧度）
+            .insert_resource(self.context.clone())// 捕获上下文
+            .add_systems(Startup, setup_capture_camera)// 建离屏相机
+            .add_systems(Startup, setup_preview_window)// 建预览窗口
+            // 捕获相机对齐到当前视角，排在相机跟随之后、渲染之前。
             .add_systems(
                 Update,
                 sync_capture_camera

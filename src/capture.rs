@@ -38,7 +38,7 @@ pub struct CaptureCamera;
 // `Deref` 让 ImageHandle 能像 Handle 一样直接用（`*handle`、自动解引用到 `handle.0`）。
 // 它保存离屏相机渲染目标纹理的句柄，由 talos/ros2 插件在装配时插入。
 #[derive(Resource, Deref, Clone)]
-pub struct ImageHandle(pub Handle<Image>);
+pub struct ImageHandle(pub Handle<Image>);// 离屏相机渲染目标纹理句柄
 
 // 离屏相机的垂直视场角（单位：弧度）；talos 用它反推相机内参，必须与主相机一致。
 #[derive(Resource, Clone, Copy)]
@@ -52,6 +52,7 @@ pub const CAPTURE_CAMERA_ORDER: isize = -100;
 /// 该相机不显示到窗口，而是把画面渲染进 `ImageHandle` 指向的纹理；
 /// talos/ros2 插件随后从这张纹理异步读回图像。函数幂等——已存在则直接返回。
 pub fn setup_capture_camera(world: &mut World) {
+    // 检查是否已存在离屏捕获相机。
     let capture_camera_exists = {
         // `query_filtered`：只查实体 ID、不取组件数据，专用于"存不存在"判断。
         let mut query = world.query_filtered::<Entity, With<CaptureCamera>>();
@@ -78,7 +79,7 @@ pub fn setup_capture_camera(world: &mut World) {
 
     // 创建离屏捕获相机实体。
     let mut capture_camera = world.spawn((
-        Camera3d::default(),
+        Camera3d::default(),// 3D 相机组件
         Tonemapping::None, // 关闭色调映射：输出原始颜色给视觉算法，避免被"美化"
         // .into() 把 Handle 转换为 Resource，Bevy 会自动管理内存。
         RenderTarget::Image(render_target_handle.into()), // 渲染到内存纹理而非窗口
@@ -120,6 +121,7 @@ pub struct PreviewImageNode;
 /// 一台 2D 相机 + 一个铺满窗口的图片节点，显示捕获纹理（即 talos 看到的那张图）。
 /// 同样幂等：相机与图片节点各自"不存在才创建"。
 pub fn setup_preview_window(world: &mut World) {
+    // 检查是否已存在预览相机。
     let preview_enabled = world
         .resource::<crate::config::SimulationConfig>().preview.enabled; 
     // 如果预览功能未开启，直接返回。
@@ -157,7 +159,6 @@ pub fn setup_preview_window(world: &mut World) {
                 height: Val::Percent(100.0), // 铺满父节点高度
                 ..default()
             },
-            // Render as a background; help text UI remains on top.
             // 中文：作为背景渲染，左上角帮助文字 UI 仍覆盖在其上方。
             GlobalZIndex(-1), // z 序置底，确保不遮挡其它 UI
             ImageNode::new(render_target_handle), // 用捕获纹理作为 2D 图片显示
@@ -169,9 +170,9 @@ pub fn setup_preview_window(world: &mut World) {
 /// 把源相机的局部变换（平移/缩放/旋转）逐字段抄给目标相机。
 /// 这里没有直接 `*our = *target`，因为目标相机可能还带有别的分量需保留。
 pub fn copy_transform(target: &Transform, our: &mut Transform) {
-    our.translation = target.translation;
-    our.scale = target.scale;
-    our.rotation = target.rotation;
+    our.translation = target.translation;// 平移
+    our.scale = target.scale;// 缩放
+    our.rotation = target.rotation;// 旋转
 }
 
 /// 每帧 Update 系统：把主相机（`CaptureSource`）的变换同步给离屏相机（`CaptureCamera`），
@@ -182,7 +183,7 @@ pub fn sync_capture_camera(
     target: Single<&Transform, (With<CaptureSource>, Without<CaptureCamera>)>,
     mut our: Single<&mut Transform, (With<CaptureCamera>, Without<CaptureSource>)>,
 ) {
-    copy_transform(&target, &mut our);
+    copy_transform(&target, &mut our);// 把主相机的变换同步给离屏相机
 }
 
 /// 针孔相机内参（与 OpenCV 约定一致，供 Talos 做像素↔射线换算）：
@@ -209,7 +210,7 @@ pub fn compute_camera_intrinsics(width: u32, height: u32, fov_y: f32) -> CameraI
 
     let cx = width as f64 / 2.0; // 主点=图像中心
     let cy = height as f64 / 2.0;
-
+    // 返回相机内参结构体。
     CameraIntrinsics {
         fx,
         fy,

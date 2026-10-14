@@ -147,6 +147,8 @@ pub fn projectile_aerodynamics(
 ) {
     // 获取空气阻力参数。
     let aero = &config.projectile.aerodynamics;
+    // 空气阻力未启用，直接返回。
+    // `return`：不执行后续代码，直接退出函数。
     if !aero.enabled {
         return;
     }
