@@ -27,20 +27,21 @@ const CHASSIS_TILT_LIMIT: f32 = 20.0 * std::f32::consts::PI / 180.0;
 /// 底盘姿态积分：把输入的方向键/摇杆量换算成 yaw 角速度并逐步加速，再积分成姿态角。
 /// 参数单位：速度均为 弧度/秒，加速度 弧度/秒²，dt 为秒。
 fn update_chassis_rotation(
-    chassis_transform: &mut Transform,
-    chassis_data: &mut InfantryChassis,
-    yaw_input: f32,
-    roll_input: f32,
-    pitch_input: f32,
-    yaw_rotation_speed: f32,
-    yaw_acceleration: f32,
-    tilt_rotation_speed: f32,
-    dt: f32,
+    chassis_transform: &mut Transform, // 底盘节点变换
+    chassis_data: &mut InfantryChassis, // 底盘节点数据
+    yaw_input: f32, // 云台手动瞄准输入（Yaw）
+    roll_input: f32, // 云台手动瞄准输入（Roll）
+    pitch_input: f32, // 云台手动瞄准输入（Pitch）
+    yaw_rotation_speed: f32, // 底盘旋转速度
+    yaw_acceleration: f32, // 底盘旋转加速度
+    tilt_rotation_speed: f32, // 底盘摆动速度
+    dt: f32, // 时间间隔
 ) {
     // 目标角速度 = 输入(-1..1) × 最大转速。
     let target_yaw_velocity = yaw_input * yaw_rotation_speed;
     // 本帧允许的最大速度增量 = 角加速度 × dt（限加速率，避免瞬间满转速）。
     let max_velocity_delta = yaw_acceleration * dt;
+    // 本帧目标角速度 = 目标角速度 - 当前角速度（限加速率，避免瞬间满转速）。
     chassis_data.yaw_velocity = move_towards(
         chassis_data.yaw_velocity,
         target_yaw_velocity,
@@ -76,11 +77,11 @@ fn move_towards(current: f32, target: f32, max_delta: f32) -> f32 {
 
 /// 本机底盘驾驶：输入 → 底盘线性力 + 底盘姿态（Input 阶段；自由相机下被跳过）。
 pub fn vehicle_controls(
-    time: Res<Time>,
-    controller: Res<ControllerState>,
-    config: Res<SimulationConfig>,
+    time: Res<Time>,    // 时间组件，用于获取 dt
+    controller: Res<ControllerState>,   // 控制器状态，包含玩家输入的本机车输入
+    config: Res<SimulationConfig>,   // 模拟配置
     // `Forces` 是 avian（bevy 版本） 的"施力入口(意思就是输入的力)"；`&Mass` 读质量；`&mut VehicleDynamic` 用其非线性加速模型。
-    // (With<Infantry>, With<Controlled>) 表示只作用于本机玩家操控的战车
+    // (With<Infantry>, With<Controlled>) 表示只作用于本机玩家操控的战车 single 表示只有一个战车
     infantry: Single<(Forces, &Mass, &mut VehicleDynamic), (With<Infantry>, With<Controlled>)>,
     // 云台（提供前进方向的参考坐标系）：底盘节点被 `Without<InfantryChassis>` 排除。
     // (GlobalTransform, &InfantryGimbal) 表示云台的全局变换和云台组件
@@ -89,10 +90,10 @@ pub fn vehicle_controls(
     // 底盘节点：要求有 InfantryChassis、无 InfantryGimbal（与上面正好互补），排除根实体 Infantry。
     chassis: Single<(&mut Transform, &mut InfantryChassis),
         (
-            With<Controlled>,
-            Without<InfantryGimbal>,
-            With<InfantryChassis>,
-            Without<Infantry>,
+            With<Controlled>,   // 只作用于本机玩家操控的战车
+            Without<InfantryGimbal>,   // 排除云台节点
+            With<InfantryChassis>,   // 只作用于底盘节点
+            Without<Infantry>,   // 排除根实体 Infantry
         ),
     >,
 ) {
@@ -111,39 +112,41 @@ pub fn vehicle_controls(
         &mut forces,
         mass, // 质量
         gimbal.into_inner().0, // 以云台朝向为"前进方向"参考（车会朝云台指的方向走）
-        input,
-        dt,
-        boost,
+        input, // 输入
+        dt, // 时间间隔
+        boost, // 加速倍率
     );
 
+    // 底盘姿态：输入 → 底盘姿态（Input 阶段；自由相机下被跳过）
+    // 参数单位：速度均为 弧度/秒，加速度 弧度/秒²，dt 为秒。
     let (mut chassis_transform, mut chassis_data) = chassis.into_inner();
     update_chassis_rotation(
-        &mut chassis_transform,
-        &mut chassis_data,
-        controller.chassis_yaw,
-        controller.chassis_roll,
-        controller.chassis_pitch,
-        config.vehicle.rotation_speed,
-        config.vehicle.yaw_acceleration,
-        config.vehicle.tilt_rotation_speed,
-        dt,
+        &mut chassis_transform, // 底盘节点变换
+        &mut chassis_data, // 底盘节点数据
+        controller.chassis_yaw, // 云台手动瞄准输入（Yaw）
+        controller.chassis_roll, // 云台手动瞄准输入（Roll）
+        controller.chassis_pitch, // 云台手动瞄准输入（Pitch）
+        config.vehicle.rotation_speed, // 底盘旋转速度
+        config.vehicle.yaw_acceleration, // 底盘旋转加速度
+        config.vehicle.tilt_rotation_speed, // 底盘摆动速度
+        dt, // 时间间隔
     );
 }
 
 /// 遥控底盘驾驶：作用于被 Tab 选中的 AI 车（`ActiveSlapper`），逻辑与 `vehicle_controls` 同构。
 pub fn remote_vehicle_controls(
-    time: Res<Time>,// 时间组件
-    controller: Res<ControllerState>,// 控制器状态
-    config: Res<SimulationConfig>,// 模拟配置
+    time: Res<Time>,    // 时间组件，用于获取 dt
+    controller: Res<ControllerState>,   // 控制器状态，包含玩家输入的遥控车输入
+    config: Res<SimulationConfig>,   // 模拟配置
     // (With<ActiveSlapper>, With<Infantry>, Without<Controlled>) 表示只作用于被 Tab 选中的 AI 车
     infantry: Single<(&GlobalTransform, Forces, &Mass, &mut VehicleDynamic),(With<ActiveSlapper>, With<Infantry>, Without<Controlled>),>,
     // (With<ActiveSlapper>, With<InfantryChassis>, Without<InfantryGimbal>, Without<Infantry>) 表示只作用于被 Tab 选中的 AI 车的底盘
     chassis: Single<(&mut Transform, &mut InfantryChassis),
         (
-            With<ActiveSlapper>,
-            With<InfantryChassis>,
-            Without<InfantryGimbal>,
-            Without<Infantry>,
+            With<ActiveSlapper>,   // 只作用于被 Tab 选中的 AI 车
+            With<InfantryChassis>,   // 只作用于底盘节点
+            Without<InfantryGimbal>,   // 排除云台节点
+            Without<Infantry>,   // 排除根实体 Infantry
         ),
     >,
 ) {
@@ -182,10 +185,10 @@ pub fn remote_vehicle_controls(
 /// 本机云台手动瞄准（自瞄订阅开启时交给 gimbal_pid 接管，本系统直接返回）。
 /// 本机云台手动瞄准（自瞄订阅开启时交给 gimbal_pid 接管，本系统直接返回）。
 pub fn gimbal_controls(
-    time: Res<Time>,// 时间组件
-    controller: Res<ControllerState>,// 控制器状态
-    enabled: Res<SubscribeAutoAim>,// 自瞄订阅状态
-    config: Res<SimulationConfig>,// 模拟配置
+    time: Res<Time>,    // 时间组件，用于获取 dt
+    controller: Res<ControllerState>,   // 控制器状态，包含玩家输入的云台手动瞄准输入
+    enabled: Res<SubscribeAutoAim>,   // 自瞄订阅状态
+    config: Res<SimulationConfig>,   // 模拟配置
     // (With<Controlled>, Without<InfantryChassis>) 表示只作用于被 Tab 选中的 AI 车的云台
     gimbal: Single<(&mut Transform, &mut InfantryGimbal),(With<Controlled>, Without<InfantryChassis>),>,
 ) {
@@ -222,10 +225,11 @@ pub fn gimbal_controls(
 }
 
 /// 遥控云台瞄准：作用于被选中的 AI 车，逻辑与 `gimbal_controls` 同构（不受自瞄开关影响）。
+/// 遥控云台瞄准：作用于被选中的 AI 车，逻辑与 `gimbal_controls` 同构（不受自瞄开关影响）。
 pub fn remote_gimbal_controls(
-    time: Res<Time>, // 时间组件
-    controller: Res<ControllerState>,// 控制器状态
-    config: Res<SimulationConfig>,// 模拟配置
+    time: Res<Time>,    // 时间组件，用于获取 dt
+    controller: Res<ControllerState>,   // 控制器状态，包含玩家输入的遥控车云台输入
+    config: Res<SimulationConfig>,   // 模拟配置
     // (With<ActiveSlapper>, Without<InfantryChassis>) 表示只作用于被 Tab 选中的 AI 车的云台
     gimbal: Single<
         (&mut Transform, &mut InfantryGimbal),
@@ -262,60 +266,64 @@ pub fn remote_gimbal_controls(
 /// `ActiveSlapper` 在根实体**和所有后代**上都要一致地存在/移除：根实体上的有无决定
 /// 展示战车自转系统是否匹配（见 spin.rs），后代上的有无决定各操控系统能否用
 /// `With/Without<ActiveSlapper>` 命中云台/底盘节点。
+/// Tab 切换"操控哪台车"：把 `ActiveSlapper` 从当前车摘掉、挂到环形序列的下一台。
 pub fn switch_slapper_control(
-    mut commands: Commands,
-    controller: Res<ControllerState>,
-    children: Query<&Children>,
-    // 全部可选车（有 Infantry + SlapperInfantry）。
-    slapper_roots: Query<Entity, (With<Infantry>, With<SlapperInfantry>)>,
-    // 当前被选中的那台。
-    active_root: Query<Entity, (With<Infantry>, With<SlapperInfantry>, With<ActiveSlapper>)>,
-    // 只关心"是否是展示战车"，不要数据 → `Query<(), With<Spinning>>`。
-    spinning_roots: Query<(), With<Spinning>>,
+    mut commands: Commands,     // 命令组件，用于修改实体组件
+    controller: Res<ControllerState>,   // 控制器状态，包含玩家输入的切换车输入
+    children: Query<&Children>,   //  子代查询组件
+    slapper_roots: Query<Entity, (With<Infantry>, With<SlapperInfantry>)>,   //  全部可选车（有 Infantry + SlapperInfantry）。
+    active_root: Query<Entity, (With<Infantry>, With<SlapperInfantry>, With<ActiveSlapper>)>,   // 当前被选中的那台。
+    spinning_roots: Query<(), With<Spinning>>,// 只关心"是否是展示战车"，不要数据 → `Query<(), With<Spinning>>`
 ) {
     // Tab 键按下时才切换
     if !controller.controlled.switch_slapper_just_pressed {
         return;
     }
 
+    // 收集所有可选车的实体（有 Infantry + SlapperInfantry 组件）
     let roots: Vec<Entity> = slapper_roots.iter().collect();
+    // 只有一台可切换车时无意义
     if roots.len() <= 1 {
-        return; // 只有一台可切换车时无意义
+        return; 
     }
 
-    // active_root.single() 返回当前被选中的那台车（如果有）；.ok() 表示如果查询失败（没有选中车），则返回 None 而不是 panic
+    // active_root.single() 返回当前被选中的那台车; ok()表示转为Option<Entity>类型表示如果查询失败（没有选中车），则返回 None 而不是 Result<Err, Entity>
     // 到下一行的 `and_then` 中处理 None 情况。
     let current = active_root.single().ok();
     // current.and_then(|e| roots.iter().position(|&r| r == e))：如果 `current` 有值，返回 `roots` 中 `e` 的下标；否则返回 None
     let current_idx = current.and_then(|e| roots.iter().position(|&r| r == e));
-    // 判断是否有当前车的下标，有则计算下一个一台的下标，无则从0开始
+    // 判断是否有当前车的下标，有则计算下一个一台的下标，无则从0开始(注：下标是在之前的哪个plugin中设置的？顺序是实现细节，不是契约 。升级引擎版本、调整场景加载顺序、增删任何组件，都可能让 Tab 的轮换次序变化。)
     let next_idx = match current_idx {
         Some(idx) => (idx + 1) % roots.len(),
         None => 0,
     };
 
-    // Remove ActiveSlapper from current
+    // 【调试】打印本次 Tab 切换时的可选车顺序与下标，用于验证 roots 顺序是否稳定。
+    // 验证完即可删除本行。
+    info!(
+        "tab-switch: roots={:?} current={:?} current_idx={:?} next_idx={}",
+        roots, current, current_idx, next_idx
+    );
+
     // （根实体 + 全部后代都要摘，见上方文档说明。）
     if let Some(current_root) = current {
+        // 从当前车摘掉 ActiveSlapper 组件
         commands.entity(current_root).remove::<ActiveSlapper>();
+        // 从当前车的所有后代摘掉 ActiveSlapper 组件
         for descendant in children.iter_descendants(current_root) {
             commands.entity(descendant).remove::<ActiveSlapper>();
         }
     }
-    // 切走时什么都不做：ActiveSlapper 被移除后，自转系统（spin_display_vehicle）
-    // 下帧自动恢复匹配，接管角速度与角阻尼。
 
     // 切换到下一个一台车
     let next_root = roots[next_idx];
     // 判断下一个车是否是展示战车
-    // 展示战车被选中：同批瞬间刹停（角速度清零 + 角阻尼恢复），防止残留自转导致操控时车身抖动侧翻。
     // Spinning 组件全程不摘不挂，切换状态完全由 ActiveSlapper 的有无决定。
     if spinning_roots.contains(next_root) {
+        // 展示战车被选中：同批瞬间刹停（角速度清零 + 角阻尼恢复）
         commands.entity(next_root).insert((
-            // AngularVelocity表示角速度设置为0
-            AngularVelocity(Vec3::ZERO),
-            // AngularDamping表示角阻尼恢复为 setup_vehicle 实配值 50.0
-            AngularDamping(50.0),
+            AngularVelocity(Vec3::ZERO),// AngularVelocity表示角速度设置为0
+            AngularDamping(50.0),// AngularDamping表示角阻尼恢复为 setup_vehicle 实配值 50.0
         ));
     }
     // 挂载 ActiveSlapper 到next_root的根实体及其所有后代实体

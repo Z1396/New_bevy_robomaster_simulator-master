@@ -69,7 +69,8 @@ impl VehicleDynamic {
         let lin_vel = forces.linear_velocity(); // 当前线速度（m/s）
         let acceleration = self.linear_accelerate(input, movement_frame, lin_vel, boost);
         // 冲量 = 加速度 × 质量 × 时间，量纲 m/s²·kg·s = kg·m/s（即动量变化，单位 N·s）。
-        // `apply_linear_impulse`：施加线性冲量，avian3d 会在物理步内把它积分进速度。
+        // `apply_linear_impulse`：施加线性冲量，avian3d 会在物理步内把它积分进速度。force 是单位 N·s。表示在参考系的"前/右"方向施加的冲量。
+        // 注意：`apply_linear_impulse` 会自动转换为"世界坐标系"，所以不需要手动转换。
         forces.apply_linear_impulse(acceleration * mass * dt);
     }
 

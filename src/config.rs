@@ -29,25 +29,25 @@ use std::path::Path;
 pub struct SimulationConfig {
     // `#[serde(default)]`：TOML 里缺这个字段就用该类型的 `Default::default()` 补上。
     #[serde(default)]
-    pub window: WindowConfig,
+    pub window: WindowConfig, // 窗口配置
     #[serde(default)]
-    pub debug: DebugConfig,
+    pub debug: DebugConfig, // 调试配置
     #[serde(default)]
-    pub preview: PreviewConfig,
+    pub preview: PreviewConfig, // 预览配置
     #[serde(default)]
-    pub render: RenderConfig,
+    pub render: RenderConfig, // 渲染配置
     #[serde(default)]
-    pub capture: CapturePipelineConfig,
+    pub capture: CapturePipelineConfig, // 采集管道配置
     #[serde(default)]
-    pub livox_ros: LivoxRosConfig,
-    // 以下四项**没有** `#[serde(default)]`：config.toml 必须提供对应小节，否则整体解析失败
+    pub livox_ros: LivoxRosConfig, // Livox ROS 配置
+    // 以下四项没有 `#[serde(default)]`：config.toml 必须提供对应小节，否则整体解析失败
     //（失败时 Default::default() 会回退到全默认值，见文件末尾）。
-    pub physics: PhysicsConfig,
-    pub vehicle: VehicleConfig,
+    pub physics: PhysicsConfig, // 物理配置
+    pub vehicle: VehicleConfig, // 车辆配置
     #[serde(default)]
-    pub mecanum: MecanumConfig,
-    pub projectile: ProjectileConfig,
-    pub camera: CameraConfig,
+    pub mecanum: MecanumConfig, // 麦克纳姆轮配置
+    pub projectile: ProjectileConfig, // 投射体配置
+    pub camera: CameraConfig, // 相机配置
 }
 
 // 窗口子配置。`Deserialize` 从 TOML 读；`Reflect`+`Clone` 便于反射/复制。
@@ -66,7 +66,7 @@ impl Default for WindowConfig {
         }
     }
 }
-
+    
 #[derive(Deserialize, Reflect, Clone)]
 // 结构体级 `#[serde(default)]`：任何缺失字段都用各自类型的默认值补齐。
 #[serde(default)]

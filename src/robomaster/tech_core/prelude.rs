@@ -31,6 +31,7 @@ pub use crate::robomaster::tech_core::construct::{
 // 等价于手写 `app.add_plugins(TechCorePlugin)`；这正是插件组合的语法糖。
 // `#[derive(Default)]`：让 `TechCorePlugins` 可无参创建（通常写 `TechCorePlugins` 即可，
 // 因为它是个零字段结构体；RoboMasterPlugins 也是同样套路）。
+/// 科技核心插件组：负责创建科技核心实体、判定命中等。
 plugin_group! {
     #[derive(Default)]
     pub struct TechCorePlugins {

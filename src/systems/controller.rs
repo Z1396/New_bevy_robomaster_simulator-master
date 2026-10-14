@@ -82,13 +82,15 @@ impl ChassisSpinMode {
         }
     }
 
+    /// 判断是否开启状态
     fn is_on(self) -> bool {
-        self == Self::On
+        self == Self::On 
     }
 }
 
 /// 单台设备的"本帧输入"快照。轴向量均已归一化到 -1..1。
 #[derive(Clone, Copy, Debug, PartialEq)]
+/// 控制器输入快照（本帧）
 pub struct ControllerInput {
     pub movement: Vec2,     // 底盘平移 (x=右/左, y=前/后)
     pub gimbal: Vec2,       // 云台转动 (x=yaw, y=pitch)
@@ -104,6 +106,7 @@ pub struct ControllerInput {
     pub auto_aim: bool,     // 自瞄订阅（本设备请求开启）
 }
 
+/// 默认值：全零/全 false 的"无输入"状态。
 impl Default for ControllerInput {
     fn default() -> Self {
         // 全零/全 false 的"无输入"状态。
@@ -124,6 +127,7 @@ impl Default for ControllerInput {
     }
 }
 
+/// 控制器输入快照（本帧）的扩展方法
 impl ControllerInput {
     /// 加速倍率：按住加速键为 2.0，否则 1.0。
     pub fn boost_multiplier(self) -> f32 {
@@ -133,7 +137,7 @@ impl ControllerInput {
     /// 云台转速缩放：精瞄时变慢。
     pub fn gimbal_scale(self) -> f32 {
         if self.precise_gimbal {
-            PRECISE_GIMBAL_SCALE
+            PRECISE_GIMBAL_SCALE // 精瞄时云台转速变慢
         } else {
             1.0
         }
@@ -141,10 +145,12 @@ impl ControllerInput {
 
     /// 累加平移输入（键盘与手柄可能同帧都产生输入，故用加法合并）。
     fn add_movement(&mut self, movement: Vec2) {
+        // 累加平移输入，各轴夹在 -1..1。
         self.movement = clamp_axes_vec2(self.movement + movement);
     }
 
-    /// 累加云台输入。
+
+    /// 累加云台输入，各轴夹在 -1..1。
     fn add_gimbal(&mut self, gimbal: Vec2) {
         self.gimbal = clamp_axes_vec2(self.gimbal + gimbal);
     }
@@ -173,17 +179,19 @@ pub struct ControllerState {
 impl ControllerState {
     /// 帧首清空两个输入快照（跨帧状态字段保持不动）。
     pub fn reset_frame(&mut self) {
-        self.controlled = ControllerInput::default();
-        self.remote = ControllerInput::default();
+        self.controlled = ControllerInput::default(); // 清空自身控制的输入快照
+        self.remote = ControllerInput::default();     // 清空远程的输入快照
     }
 
-    /// 自瞄是否激活：键盘开关或手柄扳机任一为真。
+    /// 自瞄是否激活：键盘开关或手柄扳机任一为真。keyboard_auto_aim 控制的输入快照的 auto_aim
+    /// controlled.auto_aim 控制的输入快照的 auto_aim 任一为真即为真
     pub fn auto_aim_active(&self) -> bool {
-        self.keyboard_auto_aim || self.controlled.auto_aim
+        self.keyboard_auto_aim || self.controlled.auto_aim 
     }
 
+    /// 获取当前帮助文本来源。 'static' 表示静态字符串，不会被释放。
     pub fn help_source(&self) -> &'static str {
-        self.help.source
+        self.help.source // 获取当前帮助文本来源
     }
 
     /// HUD 显示的模式名。
@@ -198,46 +206,54 @@ impl ControllerState {
     /// 依据当前模式给出对应的按键说明。
     pub fn help_controls(&self) -> &'static str {
         if self.auto_aim_active() {
-            self.help.auto_aim
+            self.help.auto_aim // 自瞄模式下的按键说明字符串
         } else {
-            self.help.manual
+            self.help.manual // 手动模式下的按键说明字符串
         }
     }
 
+    /// 控制的底盘小陀螺开关状态。
     pub fn controlled_chassis_spin(&self) -> bool {
-        self.controlled_chassis_spin.is_on()
+        self.controlled_chassis_spin.is_on() // 控制的底盘小陀螺开关状态
     }
 
+    /// 远程的底盘小陀螺开关状态。
     pub fn remote_chassis_spin(&self) -> bool {
-        self.remote_chassis_spin.is_on()
+        self.remote_chassis_spin.is_on() // 远程的底盘小陀螺开关状态
     }
 
     pub fn active_gamepad(&self) -> Option<Entity> {
         self.active_gamepad
     }
 
+    /// 切换键盘自瞄开关：F5 键。
     fn toggle_keyboard_auto_aim(&mut self) {
-        self.keyboard_auto_aim = !self.keyboard_auto_aim;
+        self.keyboard_auto_aim = !self.keyboard_auto_aim; // 切换键盘自瞄开关状态
     }
 
+    /// 切换控制的底盘小陀螺开关：LSHIFT 键。
     fn toggle_controlled_chassis_spin(&mut self) {
-        self.controlled_chassis_spin.toggle();
+        self.controlled_chassis_spin.toggle(); // 切换控制的底盘小陀螺开关状态
     }
 
+    /// 切换远程的底盘小陀螺开关：RSHIFT 键。   
     fn toggle_remote_chassis_spin(&mut self) {
-        self.remote_chassis_spin.toggle();
+        self.remote_chassis_spin.toggle(); // 切换远程的底盘小陀螺开关状态  
     }
 
+    /// 使用新的帮助文本方案。
     fn use_help(&mut self, help: ControllerHelp) {
-        self.help = help;
+        self.help = help; // 使用新的帮助文本方案
     }
 
+    /// 切换当前活跃手柄：连接手柄时调用。
     fn use_gamepad(&mut self, gamepad: Entity) {
-        self.active_gamepad = Some(gamepad);
+        self.active_gamepad = Some(gamepad); // 切换当前活跃手柄为指定手柄实体
     }
 
+    /// 清除当前活跃手柄：断开手柄时调用。
     fn clear_gamepad(&mut self) {
-        self.active_gamepad = None;
+        self.active_gamepad = None; // 清除当前活跃手柄，设为 None
     }
 }
 
@@ -250,15 +266,20 @@ pub fn clear_controller_input(mut controller: ResMut<ControllerState>) {
 
 /// 键盘采样：把按键映射成两个 `ControllerInput` 快照。
 pub fn sample_keyboard_controller(
-    keyboard: Res<ButtonInput<KeyCode>>,
+    // 键盘输入快照ButtonInput<KeyCode>表示键盘按键的输入状态，每个元素表示对应按键的输入状态，范围是[-1.0, 1.0]
+    // KeyCode 是32个按键的枚举类型，每个元素表示对应按键的输入状态
+    keyboard: Res<ButtonInput<KeyCode>>,  
+    // 控制器状态资源，包含控制的输入快照（本帧）和远程的输入快照（本帧）
     mut controller: ResMut<ControllerState>,
 ) {
     // 有键盘动作就切到键盘帮助、清掉手柄焦点（表示当前用键盘操作）。
     // keyboard_controller_active(&keyboard);创建22个按键的输入快照，返回bool值，true表示有键盘动作，false表示没有键盘动作
     let keyboard_used = keyboard_controller_active(&keyboard);
     if keyboard_used {
-        //use_help这个api意思是切换到键盘帮助文本(键盘帮助文本：W/A/S/D 移动，箭头键 云台，空格 射击，G 飞镖，Tab 切换，F3 切换相机，Q/U 切换小陀螺开关)
+        //use_help这个api意思是切换到键盘帮助文本(键盘帮助文本：W/A/S/D 移动，箭头键 云台，空格 射击，G 飞镖，Tab 切换，F3 切换相机，Q/U 切换小陀螺开关)用于可视化显示当前操作模式
         controller.use_help(ControllerHelp::keyboard());
+        // 清空手柄焦点（表示当前用键盘操作）
+        // clear_gamepad这个api意思是清空手柄实体（震动回馈用）如果模式是键盘操作，清空手柄焦点
         controller.clear_gamepad();
     }
     // Q/U 切换两台车的小陀螺开关（`just_pressed` 防连触）。按Q键切换控制的底盘小陀螺开关，
@@ -266,12 +287,13 @@ pub fn sample_keyboard_controller(
         // 如果是开启状态，切换到关闭状态；如果是关闭状态，切换到开启状态
         controller.toggle_controlled_chassis_spin();
     }
+    // 如果是开启状态，切换到关闭状态；如果是关闭状态，切换到开启状态按U键切换远程的底盘小陀螺开关，防止连按导致切换次数过多
     if keyboard.just_pressed(KeyCode::KeyU) {
-        // 如果是开启状态，切换到关闭状态；如果是关闭状态，切换到开启状态按U键切换远程的底盘小陀螺开关，防止连按导致切换次数过多
         controller.toggle_remote_chassis_spin();
     }
     // ---- 本机（controlled）----（on开启状态 == 1）
     let controlled_chassis_yaw = controller.controlled_chassis_spin.yaw_input();
+    // 控制的输入快照（本帧）
     let controlled = &mut controller.controlled;
     // add_movement这个api意思是添加键盘移动输入到控制的输入快照中，参数是W/A/S/D键的输入向量
     // 每个元素表示对应方向的输入，范围是[-1.0, 1.0]
@@ -302,6 +324,7 @@ pub fn sample_keyboard_controller(
         keyboard_axis(&keyboard, KeyCode::ArrowUp, KeyCode::ArrowDown),
     ));
 
+    // 判断是否按下了键
     controlled.boost |= keyboard.pressed(KeyCode::ShiftLeft); // `|=`：键盘或手柄任一为真即为真
     controlled.shoot |= keyboard.pressed(KeyCode::Space);       // 空格键射击
     controlled.dart_just_pressed |= keyboard.just_pressed(KeyCode::KeyG); // G键飞镖
@@ -425,12 +448,13 @@ pub fn sample_gamepad_controller(
 
 /// 把"是否订阅自瞄"同步进全局原子开关（Input 阶段）。
 pub fn update_auto_aim_subscription(
-    controller: Res<ControllerState>,
-    enabled: Res<SubscribeAutoAim>,
+    controller: Res<ControllerState>, // 读取当前控制器状态
+       enabled: Res<SubscribeAutoAim>, // 读取全局原子开关
 ) {
+    // active 为当前控制器状态的自瞄订阅开关状态
     let active = controller.auto_aim_active();
-    // `swap` 返回旧值：只有状态真正变化时才打日志（避免每帧刷屏）。
-    // 语法解释：`swap(active, Ordering::AcqRel)`：原子交换 `enabled` 中的值为 `active`，并返回旧值
+    // `值：只有状态值：只有状态真正变化时才打日志（避免每帧刷屏）。
+    // 语法解释：`swap(active, Ordering::AcqRel)`：原子交换 `enabled` 中的值为 `active`，相同则不交换、不同则交换并返回旧值
     //  - `Ordering::AcqRel`：确保读取到的旧值是最新值（`Acquire`），并确保后续写入（`Release`）按顺序执行
     if enabled.swap(active, Ordering::AcqRel) != active {
         info!(
@@ -548,7 +572,8 @@ fn keyboard_controller_active(keyboard: &ButtonInput<KeyCode>) -> bool {
         KeyCode::KeyF,  // F键
         KeyCode::KeyV,  // V键
     ];
-    // 触发键：`just_pressed` 判定（按下那一帧即算使用）。
+    //  EDGE_KEYS: [G, Tab, F3, F5, Q, U]
+    // 这些键在游戏过程中会触发一些特殊操作，如切换帮助文本、切换手感方案等。
     const EDGE_KEYS: [KeyCode; 6] = [
         KeyCode::KeyG,
         KeyCode::Tab,
@@ -559,6 +584,9 @@ fn keyboard_controller_active(keyboard: &ButtonInput<KeyCode>) -> bool {
     ];
 
     // 任一持续键按住、或任一触发键刚按下，即视为键盘活跃。
+    // .iter().any(|&key| keyboard.pressed(key))：遍历持续键数组，判断是否有任意一个键被按住
+    // .iter().any(|&key| keyboard.just_pressed(key))：遍历触发键数组，判断是否有任意一个键刚按下
+    // 任一为 true 即视为键盘活跃 触发键：`just_pressed` 判定（按下那一帧即算使用）。
     HELD_KEYS.iter().any(|&key| keyboard.pressed(key))
         || EDGE_KEYS.iter().any(|&key| keyboard.just_pressed(key))
 }
@@ -598,6 +626,7 @@ fn apply_stick_deadzone(input: Vec2) -> Vec2 {
 
 /// 把向量的两个分量各自夹到 -1..1（不改变方向，只压长度）。
 fn clamp_axes_vec2(input: Vec2) -> Vec2 {
+    // clamp(-1.0, 1.0)：把输入限制在 [-1,1] 范围内，不改变方向。
     Vec2::new(input.x.clamp(-1.0, 1.0), input.y.clamp(-1.0, 1.0))
 }
 

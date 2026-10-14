@@ -75,7 +75,6 @@ macro_rules! query {
 }
 
 /// 自制系统参数：把层级查询需要的三张只读 Query 打包成一个类型。
-///
 /// **为什么它能当系统参数？** 关键在于下面一行的 `#[derive(SystemParam)]`——该派生宏会自动
 /// 生成 `impl SystemParam for HierarchyQuery`，告诉引擎"如何"从世界里为它准备数据。只要这个
 /// impl 存在，它就和 `Query`、`Res` 一样可以写在系统函数参数里，由引擎自动注入。

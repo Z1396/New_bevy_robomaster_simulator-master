@@ -136,8 +136,6 @@ fn tracking_error(
     )
 }
 
-/// Replaces the direct pose snap that auto-aim used to apply: the solver target is
-/// tracked by a rate-limited PID loop so the gimbal moves like an actuated axis.
 /// 中文：取代过去"直接瞬移姿态"的做法——解算目标由**限速的 PID 环**追踪，
 /// 于是云台像带电机的一样平滑转动（Input 阶段，仅在自瞄订阅开启时运行）。
 pub fn gimbal_pid_controls(
@@ -148,21 +146,21 @@ pub fn gimbal_pid_controls(
     gimbal: Option<
         Single<
             (
-                &mut Transform,
-                &GlobalTransform,
-                &mut InfantryGimbal,
-                &mut GimbalAimTracker,
+                &mut Transform, // 云台节点变换
+                &GlobalTransform, // 云台节点全局变换
+                &mut InfantryGimbal, // 云台节点数据
+                &mut GimbalAimTracker, // 云台追踪器
             ),
             (
-                With<Controlled>,
-                Without<InfantryChassis>,
-                Without<InfantryLaunchOffset>,
+                With<Controlled>, // 只作用于被 Tab 选中的 AI 车
+                Without<InfantryChassis>, // 排除底盘节点
+                Without<InfantryLaunchOffset>, // 排除炮口节点
             ),
         >,
     >,
     // 炮口节点：误差在它身上量取（见 tracking_error 说明）。
     // (With<InfantryLaunchOffset>, With<Controlled>) 表示只作用于被 Tab 选中的 AI 车的炮口
-    muzzle: Option<Single<&GlobalTransform, (With<InfantryLaunchOffset>, With<Controlled>)>>,
+    muzzle: Option<Single<&GlobalTransform, (With<InfantryLaunchOffset>, With<Controlled>)>>, // 炮口节点全局变换
 ) {
     // 两者缺一都不做自瞄（`let ... else` 提前返回）。
     // 从云台中获取变换、组件

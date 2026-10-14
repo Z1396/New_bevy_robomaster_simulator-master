@@ -311,11 +311,9 @@ fn observe_once<E: EntityEvent>(world: &mut World, entity: Entity, signal: Arc<S
     });
 }
 
-/// A running async task, stored as a resource for [`drive_async_world`] to poll.
 /// 一个正在运行的异步任务，作为资源保存，供 [`drive_async_world`] 轮询。
 #[derive(Resource)]
 pub struct AsyncWorldTask {
-    // `Mutex` only to satisfy `Resource`'s `Sync` bound; the driver always has exclusive access.
     // `Mutex` 只为满足 `Resource` 的 `Sync` 约束；驱动器始终独占访问，不存在真实争用。
     // `Pin<Box<dyn Future<...>>>`：把 Future 装箱并钉住地址——因为 await 生成的 Future 可能是
     // "自引用"的，一旦移动地址就悬空，`Pin` 从类型层面禁止移动。
@@ -351,10 +349,8 @@ impl AsyncWorldTask {
     }
 }
 
-/// Polls the task, serving its world jobs, until it blocks on a [`Signal`] or finishes.
 /// 轮询任务并代为执行它的世界作业，直到它卡在某个 [`Signal`] 上或运行结束。
 ///
-/// Removes [`AsyncWorldTask`] once the task completes, which also stops this system running.
 /// 任务完成后会移除 [`AsyncWorldTask`] 资源，这也让本系统此后不再运行。
 pub fn drive_async_world(world: &mut World) {
     // `remove_resource` 把任务从世界取出（独占所有权）；不存在就直接返回。

@@ -25,7 +25,7 @@ use std::collections::HashSet;
 /// 发出碰撞事件。注意 armor/collision.rs 的子弹也复用了这个类型（跨文件契约）。
 #[derive(Component)]
 #[require(CollisionEventsEnabled)]
-pub struct Projectile;
+pub struct Projectile; // 子弹标记组件
 
 /// 已"消费"子弹的去重集合：记录哪些子弹已经处理过命中，避免同一颗子弹重复计数。
 /// `#[derive(Resource)]` 让它成为全局唯一资源（不是挂在实体上的组件）。

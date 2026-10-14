@@ -28,8 +28,10 @@ use crate::statistic::ProjectileStatistics;
 /// 每当物理引擎检测到"两个碰撞体开始接触"时被调用。
 /// 参数由引擎注入：`event` 是碰撞事件（含碰撞双方），`Query` 用过滤器筛出我们关心的实体。
 fn handle_armor_collision(
-    // `On<CollisionStart>`：事件载荷，body1/body2 是相撞双方的刚体实体，
-    // collider1/collider2 是对应的碰撞体（碰撞体常挂在刚体或其子实体上）。
+    /*Avian3D 物理库的碰撞开始事件。事件里面存：
+    - `body1, body2`：两个刚体实体
+    - `collider1, collider2`：两个碰撞体实体
+    > 重点区分：`body`= 刚体；`collider`= 碰撞几何体。刚体和碰撞体不一定是同一个 Entity，碰撞体经常是模型子实体。 */
     event: On<CollisionStart>,
     // `ResMut` = 可读写访问的全局资源（Res 是只读版）。
     mut stats: ResMut<ProjectileStatistics>,
@@ -42,16 +44,23 @@ fn handle_armor_collision(
     // 本机玩家操控的战车（Controlled 组件全局唯一），用于比较阵营。
     my_vehicle: Query<&Infantry, With<Controlled>>,
 ) {
-    // `and_then` 是 Option 的链式处理：body1 是子弹就取 Some(实体)，否则 None。
-    // 细节拆解：`projectiles.get(body)` 返回 Result（查询不一定命中），
-    // `.ok()` 把 Result 转成 Option（Err 丢弃、Ok 取值）——之后全用 Option 链处理。
-    // 这里筛选出 body1 中是子弹的实体，若 body2 也是子弹则取 body2。为什么？
-    // 因为子弹是刚体，装甲是碰撞体，刚体和碰撞体不能同时在物理空间里。
-    // 所以，当子弹和装甲碰撞时，子弹是 body1，装甲是 collider2。
-    // 若 body1 都不是子弹，返回 None。
-    // body1与body2有什么区别？
-    // body1 是碰撞双方的刚体实体，body2 是碰撞双方的碰撞体实体。
-    // 这里 body1 是子弹，body2 是装甲。
+    /*`event.body1`：`Option<Entity>`（Avian 事件里，刚体有可能为空，所以包一层 Option）
+    `projectiles.get(body)`：`Result<Entity, QueryError>`
+    `.ok()`：把`Result<T,E>` → `Option<T>`，失败就变成`None`
+    `.and_then(闭包)`：**Option 的链式方法**
+    > 规则：
+    > - 如果 `self` 是 `Some(v)` → 运行闭包，**闭包必须返回 Option**，最终结果就是闭包返回的 Option
+    > - 如果 `self` 是 `None` → 不跑闭包，直接返回 `None`
+    举 4 种碰撞场景
+    场景 1：body1 是子弹，body2 是装甲刚体
+    - `projectile_body1 = Some(子弹)`
+    - `projectile_body2 = None`
+    场景 2：body2 是子弹，body1 是装甲刚体
+    - `projectile_body1 = None`
+    - `projectile_body2 = Some(子弹)`
+    场景 3：两个都不是子弹（装甲撞墙）
+    - 两个变量都是`None`
+    场景 4：两个都是子弹（子弹和子弹相撞） */
     let projectile_body1 = event.body1.and_then(|body| projectiles.get(body).ok());
     let projectile_body2 = event.body2.and_then(|body| projectiles.get(body).ok());
 
@@ -64,7 +73,8 @@ fn handle_armor_collision(
 
     // 子弹是 body1 时对方就是 collider2，反之亦然——算出"被打中的那方"。
     let other_collider = if projectile_body1.is_some() {
-        event.collider2
+        event.collider2     // 子弹是 body1 时对方就是 collider2
+        // 反之亦然
     } else {
         event.collider1
     };
@@ -125,7 +135,7 @@ impl Plugin for ArmorCollisionPlugin {
         // 子弹销毁事件：当子弹 despawn 时触发，清理去重记录，防止集合无限增长。
         // 这两个事件分别触发 `handle_armor_collision` 和 `on_projectile_removed` 函数。
         // 观察者在物理系统（PhysicsSystem）和更新系统（UpdateSystem）里执行，确保在物理更新后和更新前。
-        app.add_observer(handle_armor_collision);
-        app.add_observer(on_projectile_removed);
+        app.add_observer(handle_armor_collision);// 物理碰撞事件：统计命中敌方装甲。
+        app.add_observer(on_projectile_removed);// 子弹销毁事件：清理去重记录，防止集合无限增长。
     }
 }

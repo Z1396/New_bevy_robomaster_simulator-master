@@ -100,6 +100,14 @@ impl From<LargeArmorLabel> for ArmorLabel {
 
 /// 装甲"规格"：把物理类型与编号打包成一个值（大装甲或小装甲 + 其携带的编号）。
 /// 关联函数风格枚举：`Small(SmallArmorLabel)` 携带具体编号——不同变体可携带不同数据。
+/*
+Trait	作用
+Debug	支持 {:?} 格式化输出，便于调试打印
+Copy	类型可按位复制；赋值/传参时不移动，而是复制，原值仍可用
+Clone	支持 .clone() 显式复制
+Eq	标记"完全等价关系"，是 PartialEq 的强化版
+PartialEq	支持 == 和 != 比较
+Hash	可用作 HashMap / HashSet 的键，支持哈希查找 */
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum ArmorSpec {
     Small(SmallArmorLabel),

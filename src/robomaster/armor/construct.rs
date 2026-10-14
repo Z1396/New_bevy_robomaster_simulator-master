@@ -138,16 +138,14 @@ impl Side {
 }
 
 /// 装甲构造器的"工具箱"：把组装过程需要的输入/输出打包成一个系统参数。
-/// 字段全是 `Query`/`Commands`/`Res`——派生 `SystemParam` 后，系统函数只写一个
-/// `constructor: ArmorConstructor` 参数即可，避免超长参数表（Bevy 系统参数过多会报错）。
+/// 把 ArmorConstructor 作为一个自定义系统参数注入到系统中，替代冗长的参数列表：`constructor: ArmorConstructor` 参数即可，避免超长参数表（Bevy 系统参数过多会报错）。
 /// 生命周期 `'w`(World) 与 `'s`(State) 由引擎在调用时提供，无需手动标具体值。
 #[derive(SystemParam)]
 pub struct ArmorConstructor<'w, 's> {
-    commands: Commands<'w, 's>,                    // 延迟写操作（插组件/销毁实体）
+    commands: Commands<'w, 's>,                    // 延迟写操作（插组件/销毁实体）(意义：在系统函数里直接调用 Commands 方法，无需手动管理实体生命周期)
     children: Query<'w, 's, Read<Children>>,       // 向下找子实体
     child_of: Query<'w, 's, Read<ChildOf>>,        // 向上找父实体（沿祖先链回溯）
-    // 只查"有父节点"的实体名——根实体通常无名，用 With<ChildOf> 过滤更省内存。
-    name: Query<'w, 's, Read<Name>, With<ChildOf>>,
+    name: Query<'w, 's, Read<Name>, With<ChildOf>>,// 只查"有父节点"的实体名——根实体通常无名，用 With<ChildOf> 过滤更省内存。
     mesh_query: Query<'w, 's, Read<Mesh3d>>,       // 判断某实体是否挂了网格
     collision_layers: Query<'w, 's, Read<CollisionLayers>>, // 读原碰撞层，复用给装甲碰撞体
     mesh_assets: Res<'w, Assets<Mesh>>,            // 网格资产仓库（按句柄取 Mesh 数据）
@@ -283,36 +281,36 @@ impl ArmorConstructor<'_, '_> {
     }
 
     /// 组装"一个装甲根"下的全部部件（ARMOR 子节点、灯条、标记、顶点、贴纸）。
-    /// - `root`：名为 *ARMOR_ROOT* 的实体；
-    /// - `armor_name`：它的名字（用 String 传入，避免与 self 的查询借用冲突）；
-    /// - `armor_data`：阵营/规格（来自触发此组装的 `ScanArmor`）。
-    /// 返回 `Option<ArmorRoot>`：中途缺件时返回 None（这块装甲被放弃，不半途残留在场上）。
     fn process_armor_root(
-        &mut self,
-        root: Entity,
-        armor_name: String,
-        armor_data: &ScanArmor,
-    ) -> Option<ArmorRoot> {
+        &mut self,   // - `self`：当前构造器实例，用于访问资产仓库、命令等。
+        root: Entity,// - `root`：名为 *ARMOR_ROOT* 的实体；
+        armor_name: String,// - `armor_name`：它的名字（用 String 传入，避免与 self 的查询借用冲突）；
+        armor_data: &ScanArmor,// - `armor_data`：阵营/规格（来自触发此组装的 `ScanArmor`）。
+    ) -> Option<ArmorRoot> // 返回 `Option<ArmorRoot>`：中途缺件时返回 None（这块装甲被放弃，不半途残留在场上）。
+    {
         // 用父子层级查询从 root 出发向下钻；HierarchyQuery 需要三个查询字段来构造。
         let query = HierarchyQuery::new(self.child_of, self.children, self.name);
         // `.of(root)` 从 root 开始，`.flatten()` 把可能为空的迭代器规范化（空则进入"终止"态）。
         let root_query = query.of(root).flatten();
+        // 代码块：处理 ARMOR 子实体体。出了这个代码块，`armor_entity` 就不存在了。
         {
             // `.."ARMOR"`：在本层子实体里找名字以 "ARMOR" 结尾的那个（suffix 语义）；
             // 表达式末尾的 `?` 是对 query! 返回的 Option 做提前返回：找不到就放弃这块装甲。
+            // query!表示在 root_query 这个迭代器里找名字以 "ARMOR" 结尾的那个实体。
             let armor_entity = query!(root_query, .."ARMOR")?;
             // 若原实体带碰撞层就沿用，否则用默认层；`.copied()` 把 &T 复制成 T，`.unwrap_or_default()` 兜底。
             let collision_layers = self
-                .collision_layers
-                .get(armor_entity)
-                .copied()
-                .unwrap_or_default();
+                .collision_layers// - `collision_layers`：默认的碰撞层，用于没有指定碰撞层的实体。
+                .get(armor_entity)// - `get`：根据实体 ID 查找碰撞层。
+                .copied()// - `copied`：把 &T 复制成 T，用于后续操作。
+                .unwrap_or_default();// - `unwrap_or_default`：若查找失败则返回默认值。
             // 给 ARMOR 实体挂"按层级自动生成三角网格碰撞体"的构造器，并沿用装甲所在碰撞层。
             self.commands.entity(armor_entity).insert(
+                // - `ColliderConstructorHierarchy`：按层级自动生成三角网格碰撞体的构造器。
                 ColliderConstructorHierarchy::new(ColliderConstructor::TrimeshFromMeshWithConfig(
                     TrimeshFlags::MERGE_DUPLICATE_VERTICES, // 合并重复顶点，缩减碰撞网格规模
                 ))
-                .with_default_layers(collision_layers),
+                .with_default_layers(collision_layers)// - `with_default_layers`：设置默认碰撞层。
             );
         }
         {
@@ -353,7 +351,7 @@ impl ArmorConstructor<'_, '_> {
         };
         // 逐条销毁不用的那套灯条（Commands 延迟执行，本帧末统一生效）。
         for hide in hide {
-            self.commands.entity(hide).despawn();
+            self.commands.entity(hide).despawn();// - `despawn`：销毁实体，从场景中移除。
         }
 
         // 静态原子计数器：`static` 全进程唯一一份；`AtomicUsize` 无锁且跨线程安全。
@@ -368,9 +366,9 @@ impl ArmorConstructor<'_, '_> {
         // `.map(...)` 对左右两个灯条根分别处理，返回 `[Vec<Entity>; 2]`。
         let lights = light_roots.map(|light_root| {
             self.children
-                .iter_descendants(light_root)
+                .iter_descendants(light_root)// - `iter_descendants`：深度优先遍历 light_root 的所有后代。
                 .filter(|entity| self.mesh_query.contains(*entity)) // 只有挂网格的才算灯条
-                .collect::<Vec<_>>()
+                .collect::<Vec<_>>()// - `collect`：把迭代器转换成 Vec<T>。
         });
         // 任一侧灯条为空，说明模型不完整，放弃这块装甲。
         if lights.iter().any(Vec::is_empty) {
@@ -525,36 +523,41 @@ fn extract_triangle_vertices(mesh: &Mesh) -> Option<Vec<Vec3>> {
 }
 
 /// 组装入口系统：每当有新插入的 `ScanArmor`，就扫描一次它的子树，把装甲部件装配出来。
-///
 /// `Added<ScanArmor>` 是 Bevy 的"变更检测"查询过滤器——匹配"在本系统上次运行之后才被添加
-/// `ScanArmor` 组件"的实体。这样组装只在需要时做一次，不必每帧重复扫描整棵场景树。
 ///（注意：并非只在实体创建瞬间；只要组件被 remove 再 add，也会再次触发。）
-///
 /// `ArmorConstructor` 是被引擎自动注入的系统参数（见其定义），此处按可变入参使用。
 fn insert(
-    root: Query<(Entity, Read<ScanArmor>), Added<ScanArmor>>,
-    mut constructor: ArmorConstructor,
+    // Entity：内部只是个 ID，用于唯一标识一个实体。
+    // `Read<ScanArmor>`：只读引用，用于获取 `ScanArmor` 组件的读取值。
+    // `Added<ScanArmor>`：只匹配在本系统上次运行之后才被添加的 `ScanArmor` 组件"的实体。
+    // `Query`：查询器，用于从场景中提取符合条件的实体。Query<(A,B,C), Filter> 表示查询实体 A、B、C 的所有符合条件的实体。
+    // 这里 `Filter` 是 `Added<ScanArmor>`，即只匹配在本系统上次运行之后才被添加的 `ScanArmor` 组件"的实体。
+    root: Query<(Entity, Read<ScanArmor>), Added<ScanArmor>>,mut constructor: ArmorConstructor,
 ) {
+    // 遍历所有新插入的 `ScanArmor` 实体。 root_entity 是根实体 ID，armor_data 是其数据。
     for (root_entity, armor_data) in root.iter() {
         // 把工具字段复制成局部只读引用，供后面多处以只读方式使用。
         let children = constructor.children;
         let name = constructor.name;
         // 找到整棵子树里所有名字含 "ARMOR_ROOT" 的实体（同一模型可能有多块装甲）。
         children
-            // `iter_descendants`：递归遍历子树，包括所有子节点。
-            .iter_descendants(root_entity)
-            // `filter_map`：对每个子节点应用闭包，返回 Some((子节点, 名字)) 或 None。
+            .iter_descendants(root_entity)// `iter_descendants`：递归遍历子树，包括所有子节点。
+            /*- `.filter()`：只筛，**不改变数据**，返回 bool
+            - `.map()`：只改数据，**不丢弃元素**
+            - `.filter_map()`：二合一，返回 Option
+            在你代码：遍历每一个子实体`child`，闭包算出`Some((child,name))`就保留，`None`就扔掉。 */
             // 这里过滤出名字包含 "ARMOR_ROOT" 的子节点。
             .filter_map(|child| {
                 name.get(child)
+// `ok()`：把 `Option<T>` 转换为 `Result<T>`，用于在系统函数里直接调用 Commands 方法。原来：`Result<名字, 错误>`调用`.ok()`：变成`Option<名字>`，错误直接丢弃。
                     .ok()
-                    .filter(|name| name.contains("ARMOR_ROOT")) // `contains`：子串匹配
-                    .map(|name| (child, name))
+                    .filter(|name| name.contains("ARMOR_ROOT")) // `这里逻辑：名字存在，并且名字包含子串"ARMOR_ROOT"`才保留这个名字，否则变成 None。
+                    .map(|name| (child, name))//Rust Option 方法,把单纯的名字`name`，包装成元组 `(child实体ID, name名字)`。
             })
-            // `for_each`：对每个过滤后的子节点应用闭包。
-            // 这里对每个装甲根调用组装逻辑，复制名字，避免借用冲突。
+            // `ent`：装甲板实体 ID / `name`：实体名字的字符串引用（`&str`，借用，不是拥有所有权）
+            // 作用：遍历迭代器里每一个元素，执行闭包。**不产生新迭代器，只是跑一遍副作用（执行函数、修改数据）**。
             .for_each(|(ent, name)| {
-                // 对每个装甲根调用组装逻辑；`to_string()` 复制名字，避免借用冲突。最后传递装甲数据。
+                // 对每个装甲根调用组装逻辑；`to_string()` 复制名字，避免借用冲突。最后传递armor_data装甲数据。
                 // 这里假设每个装甲根只处理一个装甲部件，所以直接传递 `armor_data`。
                 constructor.process_armor_root(ent, name.to_string(), armor_data);
             })

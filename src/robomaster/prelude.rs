@@ -34,13 +34,13 @@ impl Plugin for RoboMasterPlugins {
             // `StatefulAppearancePlugin`：有状态外观插件（根据实体状态动态显示/隐藏组件）。
         app.add_plugins(StatefulAppearancePlugin)
             // `ArmorPlugins`：装甲插件（处理装甲相关逻辑）。
-            .add_plugins(ArmorPlugins)
+            .add_plugins(ArmorPlugins)// - `ArmorPlugins`：负责创建装甲实体、判定命中等。
             // `PowerRunePlugins`：能量机关插件（处理能量机关相关逻辑）。
-            .add_plugins(PowerRunePlugins)
+            .add_plugins(PowerRunePlugins)// - `PowerRunePlugins`：负责创建能量机关实体、判定命中等。
             // `OutpostPlugins`：前哨站插件（处理前哨站相关逻辑）。
-            .add_plugins(OutpostPlugins)
+            .add_plugins(OutpostPlugins)// - `OutpostPlugins`：负责创建前哨站实体、判定命中等。
             // `TechCorePlugins`：科技核心插件（处理科技核心相关逻辑）。
-            .add_plugins(TechCorePlugins);
+            .add_plugins(TechCorePlugins);// - `TechCorePlugins`：负责创建科技核心实体、判定命中等。
     }
 }
 

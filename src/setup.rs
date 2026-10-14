@@ -182,7 +182,6 @@ pub fn setup_dart_launch(
     warn!("GROUND.glb is missing DART_LAUNCH_DIRECTION");
 }
 
-/// Turns a loaded robot world into a driveable vehicle: body, armor layers, chassis and gimbal.
 /// 把一个刚加载完成的机器人世界装配成可驾驶、可对战的车辆：刚体、装甲碰撞层、底盘、云台。
 ///
 /// 调用时机：由 scene.rs 在每台机器人 `spawn` 并 `await` 就绪之后调用一次。
@@ -248,22 +247,24 @@ pub fn setup_vehicle(
     // - `CollisionMargin(0.005)` 0.005 m 碰撞余量；`Mass(15.0)` 15 kg；
     //   `Restitution::new(0.01)` 弹性 0.01（几乎不反弹）；`AngularDamping(50.0)` 角阻尼，抑制打转。
     commands.entity(root).insert((
-        RigidBody::Dynamic,
+        RigidBody::Dynamic, // 动态刚体，响应物理力
+        // 车辆动态参数：最大速度、线性加速度、加速度指数
         VehicleDynamic::new(
             sim_config.vehicle.max_speed,
             sim_config.vehicle.linear_acceleration,
             sim_config.vehicle.acceleration_exponent,
         ),
+        // 组合碰撞体：包含一个圆柱碰撞体，用于检测与环境的碰撞
         Collider::compound(vec![(
             Vec3::new(0.0, -0.115649, 0.0),
             Quat::IDENTITY,
             Collider::cylinder(0.2593615, 0.231298),
         )]),
-        CollisionMargin(0.005),
-        vehicle_body_collision_layers,
-        Mass(15.0),
-        Restitution::new(0.01),
-        AngularDamping(50.0),
+        CollisionMargin(0.005), // 碰撞余量，0.005 m 车身碰撞层：与环境碰撞时，只触发一次事件
+        vehicle_body_collision_layers, // 车身碰撞层：与环境碰撞时，只触发一次事件
+        Mass(15.0),     // 车身质量，15 kg
+        Restitution::new(0.01),// 弹性 0.01（几乎不反弹）
+        AngularDamping(50.0), // 角阻尼，抑制打转
     ));
 
     // 装甲碰撞层挂到整车所有后代（装甲板是子节点）；与车身层分开，才能做到"子弹只打装甲"。

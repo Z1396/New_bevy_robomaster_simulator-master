@@ -20,11 +20,12 @@ pub use crate::robomaster::armor::marker::*;
 use bevy::app::plugin_group;
 
 // `plugin_group! { pub struct 组名 { :成员插件, ... } }`：冒号前缀表示"组内成员插件"。
-// 该宏会生成一个实现了 Plugin 的结构体，其 build 会把 ArmorConstructorPlugin 与
+// ！代表"组内成员插件"，即 ArmorConstructorPlugin 与 ArmorCollisionPlugin。(作用：利于在任意想要使用装甲的场景里直接注册这个插件组)
 // ArmorCollisionPlugin 依次加进 App。
 plugin_group! {
     pub struct ArmorPlugins {
-        :ArmorConstructorPlugin,
-        :ArmorCollisionPlugin
+        //告诉`plugin_group!`宏：打包这个插件组的时候，把 `ArmorConstructorPlugin`、`ArmorCollisionPlugin` 加进去。
+        :ArmorConstructorPlugin,// - `ArmorConstructorPlugin`：负责创建装甲实体。
+        :ArmorCollisionPlugin,// - `ArmorCollisionPlugin`：负责判定装甲实体是否被命中。
     }
 }

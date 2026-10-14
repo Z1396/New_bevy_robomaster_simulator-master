@@ -180,8 +180,11 @@ impl Controller {
 /// `muted` 以原材质 id 为键、熄灭副本句柄为值——"一个原材质只做一份熄灭副本"。
 #[derive(Resource, Default)]
 struct MaterialCache {
-    /// 缓存：以原材质 id 为键、熄灭副本句柄为值。
-    /*ssetId<StandardMaterial>表示标准材质的id，Handle<StandardMaterial>表示标准材质的句柄 都是官方提供的类型*/
+    // 缓存：以原材质 id 为键、熄灭副本句柄为值。
+    // AssetId<StandardMaterial>表示标准材质的id，Handle<StandardMaterial>表示标准材质的句柄 都是官方提供的类型
+    // 缓存：以原材质 id 为键、熄灭副本句柄为值。
+    // 每个材质只做一份熄灭副本，避免每次点亮/熄灭都新建一份材质。后续每注册一个材质控制器，就会缓存一份熄灭副本存入这个哈希表。
+    // 缓存命中直接返回（只克隆句柄，零拷贝）。
     muted: HashMap<AssetId<StandardMaterial>, Handle<StandardMaterial>>,
 }
 

@@ -20,12 +20,13 @@ use crate::systems::ControllerState;
 
 /// Tab 循环切换相机模式：Free → Robot → ThirdPerson → Free（Input 阶段）。
 pub fn following_controls(mut mode: ResMut<CameraMode>, controller: Res<ControllerState>) {
+    // 读取当前控制器状态的切换相机模式开关状态
     if controller.controlled.switch_camera_just_pressed {
         // 对枚举做 match 循环推进；三种模式显式穷尽（无 `_` 兜底，新增变体会编译报错提醒）。
         mode.0 = match mode.0 {
-            FollowingType::Free => FollowingType::Robot,
-            FollowingType::Robot => FollowingType::ThirdPerson,
-            FollowingType::ThirdPerson => FollowingType::Free,
+            FollowingType::Free => FollowingType::Robot,  // 如果当前是自由模式，切换到第一人称模式
+            FollowingType::Robot => FollowingType::ThirdPerson,  // 如果当前是第一一人称模式，切换到三人称模式
+            FollowingType::ThirdPerson => FollowingType::Free,  // 如果当前是三人称模式，切换到自由模式
         };
     }
 }
@@ -34,7 +35,7 @@ pub fn following_controls(mut mode: ResMut<CameraMode>, controller: Res<Controll
 pub fn update_camera_follow(
     // `Without<Controlled>`：主相机不挂在任何被操控的车上，避免与车实体混淆。
     camera_query: Single<(&mut Transform, &MainCamera), Without<Controlled>>,
-    infantry: Single<&Transform, (With<Infantry>, With<Controlled>)>,
+    infantry: Single<&Transform, (With<Infantry>, With<Controlled>)>,  //
     gimbal: Single<&Transform, (With<Controlled>, With<InfantryGimbal>)>,
     view_offset: Single<&Transform, (With<Controlled>, With<InfantryViewOffset>)>,
     launch_offset: Single<&Transform, (With<Controlled>, With<InfantryLaunchOffset>)>,
@@ -73,7 +74,7 @@ pub fn update_camera_follow(
 
 /// 自由相机：鼠标看向 + 键盘平移（仅在 Free 模式运行）。
 pub fn freecam_controls(
-    time: Res<Time>,
+    time: Res<Time>,    
     mode: Res<CameraMode>,
     config: Res<SimulationConfig>,
     // `MessageReader<T>`：读取消息流（消息 vs 事件的差别见 controller.rs 中 MessageWriter 的说明）。

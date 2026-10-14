@@ -256,7 +256,7 @@ async fn load_scene(w: AsyncWorld) {
             (
                 Transform::from_xyz(0.0, 1.0, 0.0),
                 Infantry::new(Team::Red, INFANTRY_THREE_CONFIG),
-                Controlled,
+                Controlled, // 本机操控标记
             ),
         )
         .await;
@@ -269,7 +269,7 @@ async fn load_scene(w: AsyncWorld) {
             (
                 Transform::from_xyz(1.0, 1.0, 1.0),
                 Infantry::new(Team::Blue, INFANTRY_THREE_CONFIG),
-                SlapperInfantry,
+                SlapperInfantry,// 表示"可被 Tab 选中操控的 AI 车"
             ),
         )
         .await;
@@ -281,11 +281,9 @@ async fn load_scene(w: AsyncWorld) {
             scene("HERO.glb"),
             (
                 Transform::from_xyz(2.0, 1.0, 1.0),
-                Infantry::new(Team::Blue, HERO_ROBOT_CONFIG),
-                //slapperInfantry 表示"可被 Tab 选中操控的 AI 车"
-                SlapperInfantry,
-                //ActiveSlapper 表示"启动时默认选中的那台可操控车"
-                ActiveSlapper,
+                Infantry::new(Team::Blue, HERO_ROBOT_CONFIG),   // infantry表示英雄机器人配置
+                SlapperInfantry,//slapperInfantry 表示"可被 Tab 选中操控的 AI 车"
+                ActiveSlapper,//ActiveSlapper 表示"启动时默认选中的那台可操控车"
             ),
         )
         .await;
@@ -300,10 +298,10 @@ async fn load_scene(w: AsyncWorld) {
         .spawn(
             scene("test.glb"),
             (
-                Transform::from_xyz(-7.0, 2.0, -5.0),
+                Transform::from_xyz(-7.0, 0.25, -5.0),
                 Infantry::new(Team::Blue, INFANTRY_THREE_CONFIG),
-                Spinning,
-                SlapperInfantry,
+                //Spinning,// 表示"闲置时绕 Y 轴匀速自转"
+                SlapperInfantry, // 表示"可被 Tab 选中操控的 AI 车"
             ),
         )
         .await;
@@ -313,7 +311,6 @@ async fn load_scene(w: AsyncWorld) {
     info!("scene loaded");
 }
 
-/// Every rune target gets a voxelized collider so hits register on the spinning arms.
 /// 中文：每个能量机关靶位都生成"体素化"碰撞体，这样打在旋转臂上的命中也能被检测到。
 ///
 /// 返回值是 `setup_collision` 需要的"节点名 → 碰撞构造指令"表；键名必须与 POWER.glb
