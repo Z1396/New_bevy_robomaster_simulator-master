@@ -256,9 +256,9 @@ pub fn setup_vehicle(
         ),
         // 组合碰撞体：包含一个圆柱碰撞体，用于检测与环境的碰撞
         Collider::compound(vec![(
-            Vec3::new(0.0, -0.115649, 0.0),
+            Vec3::new(0.0, -0.115649, 0.0),  
             Quat::IDENTITY,
-            Collider::cylinder(0.2593615, 0.231298),
+            Collider::cylinder(0.2593615, 0.239), 
         )]),
         CollisionMargin(0.005), // 碰撞余量，0.005 m
         vehicle_body_collision_layers, // 车身碰撞层：与环境碰撞时，只触发一次事件

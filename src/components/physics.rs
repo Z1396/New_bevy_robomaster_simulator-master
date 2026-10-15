@@ -105,7 +105,7 @@ pub struct ProjectileLifetime(pub Timer);
 
 /// 开火冷却计时器（全局资源，所有车/子弹共用同一节流）。
 #[derive(Resource, Deref, DerefMut)]
-pub struct ProjectileCooldown(pub Timer);// 开火冷却计时器（全局资源）
+pub struct ProjectileCooldown(pub Timer);
 
 /// 子弹的共享渲染资源：网格（Mesh）与材质，避免每颗子弹重复建资源。
 #[derive(Resource)]
