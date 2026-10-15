@@ -112,6 +112,8 @@ fn now_ns() -> u64 {
 /// 将 `#[repr(C)]` POD 结构体按字节读取（双方均为小端，直接 memcpy 语义）。
 /// 泛型 `T: Copy`：任何可平凡复制的类型都能用；返回的切片借用入参、生命期与之绑定。
 fn bytes_of<T: Copy>(value: &T) -> &[u8] {
+    // 将结构体指针转换为字节指针，再取前 `size_of::<T>()` 字节
+    // from_raw_parts：从原始指针和长度创建一个切片，不检查边界。
     unsafe { std::slice::from_raw_parts(value as *const T as *const u8, size_of::<T>()) }
 }
 
@@ -268,26 +270,30 @@ impl NetIpcPublisher {
     /// 发送一个 UDP 包（fire-and-forget，失败静默忽略，绝不阻塞渲染循环）。
     fn send_packet(&self, pkt_type: u8, index: u8, payload: &[u8]) {
         debug_assert!(payload.len() <= u16::MAX as usize); // 包头用 u16 存长度
+        // 构建包头
         let header = PacketHeader {
-            magic: NET_MAGIC,
-            version: NET_VERSION,
-            payload_len: payload.len() as u16,
-            pkt_type,
-            index,
-            _pad: 0,
-            _pad2: 0,
-            seq: self.seq.fetch_add(1, Ordering::Relaxed),
-            timestamp_ns: now_ns(),
+            magic: NET_MAGIC,    // 包头魔数，用于识别包类型。
+            version: NET_VERSION, // 包头版本，用于识别包类型。
+            payload_len: payload.len() as u16, // 载荷长度，单位字节。
+            pkt_type,// - `pkt_type`：包类型，用于识别包内容。
+            index,// - `index`：位姿槽编号。
+            _pad: 0,// - `_pad`：保留字段，用于扩展包头。
+            _pad2: 0,// - `_pad2`：保留字段，用于扩展包头。
+            seq: self.seq.fetch_add(1, Ordering::Relaxed), // - `seq`：全局递增包序号（原子，供多线程发送用）。
+            timestamp_ns: now_ns(), // - `timestamp_ns`：采集时刻，单位 **纳秒**（Unix 纪元）。
         };
 
         // 包头与载荷必须在同一个数据报内
-        // `Vec::with_capacity` 预分配，避免两次 extend 触发扩容。
+        // `Vec::with_capacity` 预分配，避免两次 extend 触发扩容。size_of::<PacketHeader>() + payload.len() 是包头与载荷的总长度。
         let mut buf = Vec::with_capacity(size_of::<PacketHeader>() + payload.len());
+        // 将包头与载荷拼接起来
         buf.extend_from_slice(bytes_of(&header));
+        // 将载荷拼接到包头后面
         buf.extend_from_slice(payload);
 
-        // `send_to` 失败（对端不可达等）只忽略；成功则刷新"最后发包时刻"供心跳判断。
+        // `send_to`是谁的 UDP 发送函数 失败（对端不可达等）只忽略；成功则刷新"最后发包时刻"供心跳判断。
         if self.udp.send_to(&buf, self.remote).is_ok() {
+            // 发送成功，刷新"最后发包时刻"供心跳判断。
             *self.last_packet.lock().unwrap() = Instant::now();
         }
     }

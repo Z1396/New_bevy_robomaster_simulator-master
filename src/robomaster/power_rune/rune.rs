@@ -23,7 +23,7 @@ use bevy::prelude::{Component, IntoScheduleConfigs, Query, Res, Time, Transform}
 /// "面"的静态配置组件。`Copy, Clone, Hash, Eq` 让它便于复制与比较（Team、RuneMode 都满足）。
 #[derive(Component, Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub struct PowerRune {
-    team: Team,     // 所属队伍（红/蓝），决定顺/逆时针与外观
+    team: Team,     // 所属队伍（红/蓝），决定顺/逆时针
     mode: RuneMode, // 小机关 / 大机关
 }
 

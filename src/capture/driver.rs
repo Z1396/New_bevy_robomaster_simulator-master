@@ -291,7 +291,7 @@ enum CapturePluginNode {
 
 /// 捕获插件的"套餐"：把彩色/深度相机捕获插件与 view_copy 插件打包成一个
 /// 可直接 `add_plugins` 的单元。talos/ros2 通过 `CaptureBundle::color(...)` /
-/// `color_and_depth(...)` 一步完成装配。
+/// `depth_from_camera_order(...)` 一步完成装配。
 pub struct CaptureBundle {
     plugins: Vec<CapturePluginNode>, // 插件节点向量
     color_target: Option<Handle<Image>>, // 彩色渲染目标图像句柄

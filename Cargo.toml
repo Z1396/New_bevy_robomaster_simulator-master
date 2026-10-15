@@ -2,14 +2,15 @@
 [workspace]
 # 工作区包含的所有crate成员
 members = [".", "crates/*"]  # "." 代表当前根目录主包daedalus；crates/* 自动加载crates文件夹下所有子crate
-resolver = "2"               # Cargo依赖解析器版本，2是新版，解决很多依赖版本冲突，Rust1.64+支持
+resolver = "2"               # Cargo依赖解析器版本，2是新版，解决很多依赖版本冲突（Cargo 1.51+可用；本项目 edition 2024 实际需要 Rust 1.85+）
 
 # 工作区全局依赖，所有成员crate都能直接复用，统一版本
 [workspace.dependencies]
 # bevy游戏引擎，版本0.19
 bevy = { version = "0.19", features = ["dynamic_linking", "jpeg"] }
 # dynamic_linking：动态链接，开发阶段编译速度快；发布release建议关掉
-# jpeg：开启jpeg图像编解码功能，正好对应你图像采集、发给talos的JPEG图像流
+# jpeg：让 bevy 能解码 jpeg 格式的图片资源（本仓库 assets 下只有 glb/ogg，并未实际用到）；
+# 发给 talos 的 JPEG 图像流由 image crate 编码（见 crates/talos-ipc/src/net_ipc.rs），与此 feature 无关
 avian3d = "0.7" # 3D物理引擎（Bevy的物理库，RoboMaster战车物理、弹丸碰撞都靠它）
 bevy-inspector-egui = "0.37" # egui可视化检视器，调试实体组件
 memmap2 = { version = "0" } # mmap内存映射库，talos ipc共享内存跨进程通信要用
@@ -37,7 +38,7 @@ rand = "0.10"                                # 随机数库，生成随机目标
 r2r = { version = "0", optional = true }    # r2r ROS2客户端，optional：只有开启ros2 feature才编译
 talos-ipc = { path = "crates/talos-ipc", optional = true } 
 # 本地子crate talos-ipc，就是你的共享内存、UDP/TCP网络桥代码，optional，talos feature启用
-crossbeam-channel = "0"                     # 高性能多线程无锁通道，线程间消息传递（UDP收包线程和bevy主线程通信）
+crossbeam-channel = "0"                     # 高性能多线程无锁通道，用于 config.toml 热重载：notify 文件监听线程 → Bevy 主线程（见 src/config.rs）
 image = "0"                                  # 图像解码编码库，处理采集的RGB图像
 egui = "0"                                   # 即时UI库，调试面板
 futures = "0"                                # Rust异步futures，异步IO相关
@@ -46,7 +47,7 @@ bevy_metalfx = { path = "crates/bevy_metalfx" } # macOS超分渲染本地插件
 toml = "1"                                   # 解析toml配置文件（就是上一段仿真配置）
 notify = "8"                                 # 文件监听，配置文件热重载
 serde = { version = "1", features = ["derive"] } # 序列化库，derive自动生成序列化代码（结构体转json）
-serde_json = "1"                             # json序列化，foxglove输出trace日志用
+serde_json = "1"                             # json序列化，用于科技核心状态 JSON 导出（src/robomaster/tech_core/construct.rs，发布到 /simulator/tech_core/state 话题）
 clap = { version = "4.6", features = ["derive"] } # 命令行参数解析，启动参数
 ffmpeg-next = { version = "8.1.0", optional = true } # ffmpeg绑定，optional，ffmpeg feature开启
 

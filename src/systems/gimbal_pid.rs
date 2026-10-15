@@ -20,7 +20,6 @@ pub struct GimbalAimTarget {
 }
 
 impl GimbalAimTarget {
-    /// Solver commands arrive in degrees with pitch measured from the vertical axis.
     /// 中文：解算方给出的角度以**度**为单位，且 pitch 是从**竖直轴**量起的——
     /// 故这里换算成弧度，并把 pitch 减 90° 转成"从水平面量起"（与 `InfantryGimbal` 一致）。
     pub fn from_solver_degrees(yaw_deg: f32, pitch_deg: f32) -> Self {
@@ -139,10 +138,9 @@ fn tracking_error(
 /// 中文：取代过去"直接瞬移姿态"的做法——解算目标由**限速的 PID 环**追踪，
 /// 于是云台像带电机的一样平滑转动（Input 阶段，仅在自瞄订阅开启时运行）。
 pub fn gimbal_pid_controls(
-    time: Res<Time>,
-    config: Res<SimulationConfig>,
+    time: Res<Time>,    // 时间组件
+    config: Res<SimulationConfig>, // 模拟配置组件
     // `Option<Single<...>>`：tracker 可能不存在（无目标）——那就整体跳过，不报错。
-    // (With<Controlled>, Without<InfantryChassis>) 表示只作用于被 Tab 选中的 AI 车的云台
     gimbal: Option<
         Single<
             (
@@ -151,6 +149,7 @@ pub fn gimbal_pid_controls(
                 &mut InfantryGimbal, // 云台节点数据
                 &mut GimbalAimTracker, // 云台追踪器
             ),
+            // (With<Controlled>, Without<InfantryChassis>, Without<InfantryLaunchOffset>) 表示只作用于被 Tab 选中的 AI 车的云台
             (
                 With<Controlled>, // 只作用于被 Tab 选中的 AI 车
                 Without<InfantryChassis>, // 排除底盘节点

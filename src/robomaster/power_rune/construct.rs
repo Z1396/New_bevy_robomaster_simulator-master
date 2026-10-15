@@ -121,7 +121,7 @@ fn build_targets(
             )
         }
 
-        // 组装一个靶位的全部控制器（靶体按可见性切换，腿/衬垫/进度按材质切换）。
+        // 组装一个靶位的全部控制器（靶体与进度段按可见性切换，腿与衬垫按材质切换）。
         targets.push(RuneVisual::new(
             Controller::new_visibility(deactivated, activating, activated, completed),
             legging_segments,
@@ -225,8 +225,8 @@ pub(crate) fn setup_power_rune(
             Team::Red => red_clockwise,
             Team::Blue => !red_clockwise,
         };
-        // 组装整面可视化：根灯用同一实体占满 4 个阶段（亮/灭由材质控制），
-        // 5 个靶位沿用上面构建好的控制器。
+        // 组装整面可视化：根灯填满 4 个阶段槽——"未激活"槽放熄灭节点，其余 3 个槽
+        // 都放同一个点亮节点（亮/灭由可见性控制）；5 个靶位沿用上面构建好的控制器。
         let mut visuals = PowerRuneVisuals::new(
             Controller::new_visibility(deactivated, activated, activated, activated),
             targets,

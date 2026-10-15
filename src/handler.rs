@@ -32,10 +32,10 @@ use crate::{
 /// 监听 `RuneActivated`：能量机关被激活时播放提示音。
 /// `On<RuneActivated>` 是事件载荷，`ev.rune` 是被激活的那个"面"的实体（EntityEvent 的目标字段）。
 pub fn on_activate(
-    ev: On<RuneActivated>,
-    mut commands: Commands,
-    query: Query<&PowerRune>,
-    asset_server: Res<AssetServer>,
+    ev: On<RuneActivated>,  // 能量机关激活事件
+    mut commands: Commands, // 延迟命令：用于生成实体
+    query: Query<&PowerRune>, // 查询目标实体的机关标记组件
+    asset_server: Res<AssetServer>, // 资源服务器：按路径加载音频等资产
 ) {
     // `let Ok(_rune) = ... else { return };`：提前返回写法——目标实体查不到就什么都不做。
     // 下划线前缀 `_rune` 表示"取到但故意不用"，只是用它验证该实体确实是 PowerRune。

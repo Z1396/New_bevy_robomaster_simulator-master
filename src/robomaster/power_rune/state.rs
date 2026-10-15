@@ -206,7 +206,7 @@ impl MechanismState {
                 *self = Self::activated(mode);
                 RuneHitOutcome::Activated
             }
-            // 其它结果（PrimaryHit / SecondaryHit / Ignored）原样返回。
+            // 其它结果（PrimaryHit / SecondaryHit）原样返回。
             outcome => outcome,
         }
     }
@@ -562,7 +562,7 @@ fn tick_two_timers(
         *global_remaining = 0.0;
         global_transition
     } else {
-        // 阶段先到期：把 delta 中"用掉的部分"补给全局计时器，阶段清零。
+        // 阶段先到期：全局计时器也扣掉等量时间（与阶段计时同步消耗），阶段清零。
         *global_remaining -= *local_remaining;
         *local_remaining = 0.0;
         local_transition
@@ -646,7 +646,7 @@ mod tests {
         assert_eq!(active_indices(&state).len(), 1);
     }
 
-    /// 大机关：打中副靶得到 SecondaryHit，但进度要等副靶窗超时后才推进（并点亮新的 2 个主靶）。
+    /// 大机关：打中副靶得到 SecondaryHit，但轮次要等副靶窗超时后才推进（并点亮新的 2 个主靶）。
     #[test]
     fn large_rune_secondary_hit_waits_for_window_timeout() {
         let mut rng = rand::rng();

@@ -115,7 +115,7 @@ impl Control for Controller {
                     mesh_material.0 = apply.clone()
                 }
             }
-            // 显隐分支：算出"要让谁显示(show)、让谁隐藏(hide)"，hide 是个四元素数组。
+            // 显隐分支：算出"要让谁显示(show)、让谁隐藏(hide)"，hide 是个三元素数组（其余三个状态）。
             Self::Visibility(deactivated, activating, activated, completed) => {
                 // 每个状态：把当前状态对应的实体作为 show，其余三个塞进 hide 数组一并隐藏。
                 let (show, hide) = match state {

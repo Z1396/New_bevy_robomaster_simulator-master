@@ -103,9 +103,12 @@ impl TalosIpcPublisher {
         timestamp_ns: u64,
     ) {
         match self {
+            // 发布共享内存位姿槽位
+            // 发布网络位姿槽位
             Self::Shm(publisher) => {
                 publisher.publish_pose(index, position, quaternion, frame_seq, timestamp_ns);
-            }
+            },
+            // 发布网络位姿槽位
             Self::Net(publisher) => {
                 publisher.publish_pose(index, position, quaternion, frame_seq, timestamp_ns);
             }

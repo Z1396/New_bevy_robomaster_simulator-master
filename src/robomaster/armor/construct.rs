@@ -53,7 +53,7 @@ pub struct ScanArmor {
 }
 
 impl ScanArmor {
-    /// `const fn`：可在编译期常量里构造（本项目多个 `RobotConfig` 常量依赖它）。
+    /// `const fn`：可在编译期常量里构造。
     pub const fn new(team: Team, spec: ArmorSpec) -> Self {
         Self { team, spec }
     }
@@ -145,7 +145,7 @@ pub struct ArmorConstructor<'w, 's> {
     commands: Commands<'w, 's>,                    // 延迟写操作（插组件/销毁实体）(意义：在系统函数里直接调用 Commands 方法，无需手动管理实体生命周期)
     children: Query<'w, 's, Read<Children>>,       // 向下找子实体
     child_of: Query<'w, 's, Read<ChildOf>>,        // 向上找父实体（沿祖先链回溯）
-    name: Query<'w, 's, Read<Name>, With<ChildOf>>,// 只查"有父节点"的实体名——根实体通常无名，用 With<ChildOf> 过滤更省内存。
+    name: Query<'w, 's, Read<Name>, With<ChildOf>>,// 只查"有父节点"的实体名——`of(root)` 的根只作遍历起点，不参与名字过滤（契约见 util/entity_query.rs）。
     mesh_query: Query<'w, 's, Read<Mesh3d>>,       // 判断某实体是否挂了网格
     collision_layers: Query<'w, 's, Read<CollisionLayers>>, // 读原碰撞层，复用给装甲碰撞体
     mesh_assets: Res<'w, Assets<Mesh>>,            // 网格资产仓库（按句柄取 Mesh 数据）
@@ -292,7 +292,7 @@ impl ArmorConstructor<'_, '_> {
         let query = HierarchyQuery::new(self.child_of, self.children, self.name);
         // `.of(root)` 从 root 开始，`.flatten()` 把可能为空的迭代器规范化（空则进入"终止"态）。
         let root_query = query.of(root).flatten();
-        // 代码块：处理 ARMOR 子实体体。出了这个代码块，`armor_entity` 就不存在了。
+        // 代码块：处理 ARMOR 子实体。出了这个代码块，`armor_entity` 就不存在了。
         {
             // `.."ARMOR"`：在本层子实体里找名字以 "ARMOR" 结尾的那个（suffix 语义）；
             // 表达式末尾的 `?` 是对 query! 返回的 Option 做提前返回：找不到就放弃这块装甲。
@@ -405,7 +405,7 @@ impl ArmorConstructor<'_, '_> {
             self.commands.entity(vertex).insert((
                 VertexData {
                     side,
-                    points: v.clone(), // 复制一份存进组件，原 Vec 仍返回给调用方
+                    points: v.clone(), // 复制一份存进组件
                 },
                 Visibility::Hidden, // 顶点网格仅作数据用，不渲染
             ));
@@ -549,7 +549,7 @@ fn insert(
             // 这里过滤出名字包含 "ARMOR_ROOT" 的子节点。
             .filter_map(|child| {
                 name.get(child)
-// `ok()`：把 `Option<T>` 转换为 `Result<T>`，用于在系统函数里直接调用 Commands 方法。原来：`Result<名字, 错误>`调用`.ok()`：变成`Option<名字>`，错误直接丢弃。
+// `ok()`：把 `Result<T, E>` 转换为 `Option<T>`，用于在系统函数里直接调用 Commands 方法。原来：`Result<名字, 错误>`调用`.ok()`：变成`Option<名字>`，错误直接丢弃。
                     .ok()
                     .filter(|name| name.contains("ARMOR_ROOT")) // `这里逻辑：名字存在，并且名字包含子串"ARMOR_ROOT"`才保留这个名字，否则变成 None。
                     .map(|name| (child, name))//Rust Option 方法,把单纯的名字`name`，包装成元组 `(child实体ID, name名字)`。

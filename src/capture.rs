@@ -18,10 +18,10 @@ pub mod view_copy;
 use bevy::camera::RenderTarget; // 相机渲染目标：窗口 or 内存纹理
 use bevy::core_pipeline::prepass::DepthPrepass; // 预写深度缓冲，深度相关处理需要
 use bevy::core_pipeline::tonemapping::Tonemapping; // 色调映射开关
-use bevy::prelude::*;
+use bevy::prelude::*;// 引入 Bevy 标准组件、系统、资源等
 
-use crate::config::SimulationConfig;
-use bevy_metalfx::{MetalFxTemporalUpscaling, UpscaleFactor};
+use crate::config::SimulationConfig;// 引入模拟配置
+use bevy_metalfx::{MetalFxTemporalUpscaling, UpscaleFactor};// 引入金属特效插件
 
 // 把 driver 里的 CaptureBundle 提到本模块顶层，外部可直接写 `crate::capture::CaptureBundle`。
 pub use driver::CaptureBundle;
@@ -63,7 +63,7 @@ pub fn setup_capture_camera(world: &mut World) {
         return;
     }
     // 从资源中获取渲染目标纹理句柄和垂直视场角。
-    // 这两个值在 setup.rs 中设置，这里直接从资源中取。.0 是解引用，获取组件数据。
+    // 这两个值由 talos/ros2 捕获插件装配时插入（见 talos/capture.rs、ros2/capture.rs），这里直接从资源中取。.0 是解引用，获取组件数据。
     // render_target_handle不是 C/C++ 那种裸指针，是 Bevy 的资源句柄 (Handle)，本质是一个带 ID 的 “引用标记”，不是内存地址指针。
     let render_target_handle = world.resource::<ImageHandle>().0.clone();
     let fov = world.resource::<CameraFov>().0;
@@ -81,7 +81,7 @@ pub fn setup_capture_camera(world: &mut World) {
     let mut capture_camera = world.spawn((
         Camera3d::default(),// 3D 相机组件
         Tonemapping::None, // 关闭色调映射：输出原始颜色给视觉算法，避免被"美化"
-        // .into() 把 Handle 转换为 Resource，Bevy 会自动管理内存。
+        // .into() 把 Handle<Image> 转换成 RenderTarget::Image 变体要求的 ImageRenderTarget。
         RenderTarget::Image(render_target_handle.into()), // 渲染到内存纹理而非窗口
         Camera {
             // order：相机渲染顺序，值越小越先渲染。
@@ -102,8 +102,8 @@ pub fn setup_capture_camera(world: &mut World) {
         CaptureCamera, // 标记：本相机用于捕获
     ));
     // 如果启用了 MetalFX，把组件插入相机。
-    // 这里按需插入，避免在非 macOS 平台编译时引入 MetalFX 相关代码。
-    // 这样可以保持代码的可移植性，只在需要时才引入 MetalFX 相关代码。
+    // 这里按条件插入：非 macOS 平台上 cfg! 恒为 false，不会走到插入分支。
+    // 这样可以保持代码的可移植性，只在需要时才插入 MetalFX 相关组件。
     if let Some(metalfx) = metalfx {
         capture_camera.insert(metalfx);
     }
@@ -111,11 +111,11 @@ pub fn setup_capture_camera(world: &mut World) {
 
 // 预览相机（2D）：把捕获纹理当作一张全屏图片显示出来。
 #[derive(Component)]
-pub struct PreviewCamera;
+pub struct PreviewCamera;// 预览相机组件
 
 // 预览图片节点：承载 `ImageNode` 的 UI 实体，铺满窗口。
 #[derive(Component)]
-pub struct PreviewImageNode;
+pub struct PreviewImageNode;// 预览图片节点组件
 
 /// 启动系统：当 `config.preview.enabled` 为真时创建屏幕预览——
 /// 一台 2D 相机 + 一个铺满窗口的图片节点，显示捕获纹理（即 talos 看到的那张图）。
@@ -159,7 +159,7 @@ pub fn setup_preview_window(world: &mut World) {
                 height: Val::Percent(100.0), // 铺满父节点高度
                 ..default()
             },
-            // 中文：作为背景渲染，左上角帮助文字 UI 仍覆盖在其上方。
+            // 中文：作为背景渲染，左下角帮助文字 UI 仍覆盖在其上方。
             GlobalZIndex(-1), // z 序置底，确保不遮挡其它 UI
             ImageNode::new(render_target_handle), // 用捕获纹理作为 2D 图片显示
             PreviewImageNode, // 标记：本节点用于预览
@@ -168,7 +168,7 @@ pub fn setup_preview_window(world: &mut World) {
 }
 
 /// 把源相机的局部变换（平移/缩放/旋转）逐字段抄给目标相机。
-/// 这里没有直接 `*our = *target`，因为目标相机可能还带有别的分量需保留。
+/// 逐字段赋值与 `*our = *target` 等价——Bevy 的 `Transform` 只有这三个分量。
 pub fn copy_transform(target: &Transform, our: &mut Transform) {
     our.translation = target.translation;// 平移
     our.scale = target.scale;// 缩放

@@ -42,7 +42,7 @@ pub struct InfantryChassis {
 
 /// 云台节点组件：云台相对底盘的偏航，与云台自身的俯仰，单位弧度。
 #[derive(Component, Default)]
-pub struct InfantryGimbal {
+pub struct InfantryGimbal {// 云台节点组件
     /// 云台相对底盘的偏航角（弧度）
     pub local_yaw: f32,
     /// 云台俯仰角（弧度），受 config 的 gimbal_pitch_limit 限制
@@ -52,16 +52,16 @@ pub struct InfantryGimbal {
 /// 相机/瞄准点节点标记（对应 glTF 的 `CAM_DIRECTION`）。
 /// 契约：systems/camera.rs 的 Robot 模式从这里取第一人称视角。
 #[derive(Component)]
-pub struct InfantryViewOffset;
+pub struct InfantryViewOffset;// 相机/瞄准点节点组件
 
 /// 炮口/发射点节点标记（对应 glTF 的 `SHOT_DIRECTION`）。
 /// 契约：systems/projectile.rs 从这里取子弹的发射位置与朝向。
 #[derive(Component)]
-pub struct InfantryLaunchOffset;
+pub struct InfantryLaunchOffset;// 炮口节点组件
 
 /// 可被 Tab 选中操控的 AI 战车标记（区别于玩家车与展示战车）。
 #[derive(Component)]
-pub struct SlapperInfantry;
+pub struct SlapperInfantry;// 可被 Tab 选中操控的 AI 战车组件
 
 /// 中文：当前被选中的那台"可操控 AI 车"标记——有它才响应玩家输入，由
 /// `switch_slapper_control` 在 Tab 切换时运行时补挂/摘除。
@@ -70,4 +70,4 @@ pub struct ActiveSlapper;
 
 /// 展示战车永久能力标记，从不摘除；形态切换完全由根实体上有无 ActiveSlapper 决定。
 #[derive(Component)]
-pub struct Spinning;
+pub struct Spinning;// 展示战车永久自旋能力标记组件

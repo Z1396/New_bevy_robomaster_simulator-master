@@ -29,7 +29,7 @@ use bevy::ecs::system::SystemParam;
 use bevy::ecs::system::lifetimeless::Read;
 // Entity / Query / ChildOf / Children / Name 等常用类型都在 prelude。
 use bevy::prelude::*;
-// 第三方 exact crate 的两个扩展 trait：给迭代器提供 `exact::<N>()`（"恰好 N 个"）与 `into_single()`。
+// 本地 exact crate（crates/exact）的两个扩展 trait：给迭代器提供 `exact::<N>()`（"恰好 N 个"）与 `into_single()`。
 use exact::{ExactExt, ExactOneExt};
 // `Empty<Entity>` 类型与 `empty()` 构造函数：零成本、零分配的空迭代器。
 use std::iter::{Empty, empty};
@@ -49,7 +49,7 @@ macro_rules! query {
         $crate::query!(@internal $query, $($tt)*)
     };
     // ── 内部递归臂（`@internal` 是约定俗成的私有标记，防止外部直接调用）──
-    // 从右往左读 token：`.."X"` 是"后缀"——筛"名字以 X 结尾"的子节点。
+    // 按从左到右的顺序逐段消费 token：`.."X"` 是"后缀"——筛"名字以 X 结尾"的子节点。
     (@internal $query: expr, ..$ident:literal $($tt:tt)*) => {
         $crate::query!(@internal $query.suffix($ident) $($tt)*)
     };
@@ -157,7 +157,7 @@ macro_rules! impl_hierarchy {
         // `#[inline]`：建议编译器内联——这类小适配器内联后没有额外开销。
         #[must_use]
         #[inline]
-        // 接收 `suffix: T`，`T: Into<&'q str>` 表示 `&str` 和 `String` 都能传。
+        // 接收 `suffix: T`，`T: Into<&'q str>`：目前只有 `&str` 本身满足该约束（`String` 需先 `.as_str()`）。
         $v fn $method_name<T: Into<&'q str>>(
             self,
             suffix: T,

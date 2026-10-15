@@ -2,7 +2,7 @@
 //! 拆成独立子模块，是整个 robomaster 目录树的入口（对应 src/robomaster/ 目录）。
 //!
 //! 游戏语言：这里管的是仿真器要模拟的 RoboMaster 战场对象——`armor`（装甲板与命中判定）、
-//! `outpost`（前哨站旋转靶）、`power_rune`（能量机关）、`tech_core`（工程核心）、
+//! `outpost`（前哨站旋转靶）、`power_rune`（能量机关）、`tech_core`（科技核心）、
 //! `vehicle`（战车运动学/动力学），另有 `visibility`（伪装/显隐层）与 `common`
 //! （跨子系统共享的 Team、机器人配置等基础类型）。
 //!

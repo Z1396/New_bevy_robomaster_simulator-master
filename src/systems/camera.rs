@@ -36,11 +36,10 @@ pub fn following_controls(mut mode: ResMut<CameraMode>, controller: Res<Controll
 pub fn update_camera_follow(
     
     camera_query: Single<(&mut Transform, &MainCamera), Without<Controlled>>,// `Without<Controlled>`：主相机不挂在任何被操控的车上，避免与车实体混淆。
-    
     infantry: Single<&Transform, (With<Infantry>, With<Controlled>)>, // 从 Bevy 获取被操控的车实体的变换组件，用于计算相机位置 
     gimbal: Single<&Transform, (With<Controlled>, With<InfantryGimbal>)>, // 从 Bevy 获取被操控的车实体的云台实体的变换组件，用于计算相机旋转
-    view_offset: Single<&Transform, (With<Controlled>, With<InfantryViewOffset>)>, // 从 Bevy 获取被操控的车实体的 CAM_DIRECTION 节点的变换组件，用于计算相机位置
-    launch_offset: Single<&Transform, (With<Controlled>, With<InfantryLaunchOffset>)>,// 从 Bevy 获取被操控的车实体的炮口实体的变换组件，用于计算相机旋转
+    view_offset: Single<&Transform, (With<Controlled>, With<InfantryViewOffset>)>, // 从 Bevy 获取被操控的车实体的 InfantryViewOffset 组件的变换组件，用于计算相机位置
+    launch_offset: Single<&Transform, (With<Controlled>, With<InfantryLaunchOffset>)>,// 从 Bevy 获取被操控的车实体的 InfantryLaunchOffset 组件的变换组件，用于计算相机旋转
     mode: Res<CameraMode>, // 从 Bevy 获取当前相机模式组件，用于判断相机模式
 ) {
     // `into_inner()`：把 Single 解包成里面的元组/引用，避免反复解引用。
@@ -59,17 +58,25 @@ pub fn update_camera_follow(
         FollowingType::Robot => {
             // 第一人称：相机放在 CAM_DIRECTION 节点处，朝向与炮口方向合成一致。
             let view_offset_transform = view_offset.into_inner();
-            // 车世界旋转 × 云台本地旋转 = 云台世界旋转。
+            // 云台世界旋转 ≈ 车世界旋转 × 云台本地旋转
+            // （严格说中间还有 VEHICLE 节点那一层；当前资产里它的旋转是单位阵，故可省略）
             let gimbal_world_rotation = infantry.rotation * gimbal_transform.rotation;
-            // CAM_DIRECTION 在云台坐标系里的局部偏移，旋转到世界方向。
+            // `view_offset_transform.translation` 是 CAM_DIRECTION 节点在"云台坐标系"下的
+            // 局部平移（单位米）；用云台世界旋转把它转到世界系，得到"从车指向相机的世界偏移向量"。
             let view_offset_world = gimbal_world_rotation * view_offset_transform.translation;
 
-            // 相机位置 = 车世界位置 + CAM_DIRECTION 世界偏移。
+            // 相机是顶层实体（没有父级），所以它的 `Transform` 直接就是世界变换，无需再乘父级旋转。
+            // 世界位置 = 车世界位置 + CAM_DIRECTION 的世界偏移。
+            // 末尾的 `+ Vec3::from([0.0, 0.0, 0.0])` 是加零、当前无任何作用，留作以后微调位置用。
             camera_transform.translation = infantry.translation + view_offset_world + Vec3::from([0.0, 0.0, 0.0]);
-            // 朝向 = 云台世界旋转 × 炮口局部旋转 × Rz(90°)（Bevy 相机朝 -Z，需要这个修正）。
+            // 朝向 = 云台世界旋转 × 炮口局部旋转 × Rz(90°)。
+            // 最后这项是"画面横滚修正"：绕局部 Z（视线轴）转 90°，让渲染出的图像正立。
+            // 注意它**不改变视线方向**——NEG_Z 在"绕 Z 轴旋转"下是不变的，所以它与弹道方向无关；
+            // 但该值必须与 projectile.rs 里的同一套合成保持一致（见 projectile.rs L91-98），
+            // 改了它画面会整体歪掉、视觉端解算随之出错。
             camera_transform.rotation = (gimbal_world_rotation
-                * launch_offset.rotation
-                * Quat::from_euler(EulerRot::ZYX, 0.0, 0.0, PI / 4.0))
+                * launch_offset.rotation // 炮口（SHOT_DIRECTION）局部旋转
+                * Quat::from_euler(EulerRot::ZYX, 0.0, 0.0, PI / 2.0))
             .normalize() // 确保旋转矩阵是正交的，避免旋转矩阵的不稳定性
         }
         FollowingType::ThirdPerson => {

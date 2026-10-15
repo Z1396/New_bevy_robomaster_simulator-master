@@ -57,13 +57,13 @@ impl HitResult {
     }
 }
 
-/// 机关被激活的事件。`#[derive(EntityEvent)]` = "带目标实体的实体事件"：
+/// 机关被激活的事件。`#[derive(EntityEvent)]` = "带目标实体的实体事件"：是Bevy的事件系统，用于在实体之间传递信息
 /// `#[event_target]` 标注的字段就是事件目标——这里是被激活的那个面。
 /// 用 `commands.trigger(...)` 发出，别的系统用 `On<RuneActivated>` 接收。
 #[derive(EntityEvent)]
 pub struct RuneActivated {
     #[event_target]
-    pub rune: Entity,
+    pub rune: Entity,  // 能量机关实体
 }
 
 /// 一次命中（无论结果好坏）都会发的事件，附带本次的 `HitResult`。

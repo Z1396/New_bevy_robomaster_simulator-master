@@ -58,15 +58,16 @@ pub fn spawn_text(commands: &mut Commands) {
 
 /// 每帧刷新 HUD 文本（GameLogic 阶段）。
 pub fn update_help_text(
-    mut text: Query<&mut Text>,       // 只作用于被 Tab 选中的 AI 车
+    mut text: Query<&mut Text>,       // 所有文本实体（当前只有 spawn_text 创建的 HUD 这一个）
     auto_aim: Res<SubscribeAutoAim>,  // 从 SubscribeAutoAim 系统获取自瞄开关
     stats: Res<ProjectileStatistics>,  // 从 ProjectileStatistics 系统获取命中统计
     controller: Res<ControllerState>,  // 从 ControllerState 系统获取控制器状态
 ) {
-    // 遍历所有被 Tab 选中的 AI 车，更新 HUD 文本
+    // 遍历所有文本实体，刷新 HUD 文本
     for mut text in text.iter_mut() {
         *text = create_help_text(
-            // `Acquire` 顺序读原子开关，与 talos/ROS2 线程的写入侧配对。
+            // `Acquire` 顺序读原子开关，与写入侧（update_auto_aim_subscription 的 `AcqRel` 交换）配对；
+            // talos/ROS2 线程同样以 `Acquire` 读同一开关（见 talos/capture.rs）。
             auto_aim.load(std::sync::atomic::Ordering::Acquire),
             &stats, // 从 ProjectileStatistics 系统获取命中统计
             &controller, // 从 ControllerState 系统获取控制器状态
@@ -77,18 +78,18 @@ pub fn update_help_text(
 /// Shift+C 轮换装甲贴纸样式（调试用，作用于可被选中的 AI 车）。
 pub fn change_appearance(
     keyboard: Res<ButtonInput<KeyCode>>,  // 从 Input 系统获取按键状态
-    selections: Query<&mut ArmorStickerSelection, With<SlapperInfantry>>,  // 只作用于被 Tab 选中的 AI 车
-    owned: Query<&mut Armor, With<SlapperInfantry>>,  // 只作用于被 Tab 选中的 AI 车
+    selections: Query<&mut ArmorStickerSelection, With<SlapperInfantry>>,  // 只作用于可被 Tab 选中的 AI 车（With<SlapperInfantry>）
+    owned: Query<&mut Armor, With<SlapperInfantry>>,  // 只作用于可被 Tab 选中的 AI 车（With<SlapperInfantry>）
 ) {
     // `pressed`（持续按住）与 `just_pressed`（本帧刚按下）组合成"Shift + C"这个组合键。
     if keyboard.pressed(KeyCode::ShiftLeft) && keyboard.just_pressed(KeyCode::KeyC) {
         let mut n_type = None;      // 记录所有 AI 车的最新贴纸样式
-        // 遍历所有被 Tab 选中的 AI 车，切换贴纸样式
+        // 遍历所有可被 Tab 选中的 AI 车，切换贴纸样式
         for mut selection in selections {
             let new_typ = selection.advance_debug_sequence();   // 切换到下一个贴纸样式
             n_type = Some(new_typ);   // 记录最新贴纸样式
         }
-        // 更新所有被 Tab 选中的 AI 车的贴纸样式
+        // 更新所有可被 Tab 选中的 AI 车的贴纸样式
         if let Some(n_type) = n_type {
             for mut own in owned {
                 own.label = n_type; // 更新贴纸样式

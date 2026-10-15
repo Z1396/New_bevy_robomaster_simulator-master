@@ -40,6 +40,23 @@ pub struct TalosSubscriberRes(pub Arc<Mutex<TalosIpcSubscriber>>);
 #[derive(Resource, Deref, DerefMut)]
 pub struct TalosEnabled(pub AtomicBool);// 原子布尔值，用于控制是否接收视觉程序的自瞄指令。
 
+/// 【调试·临时】自瞄指令到达率统计。用于判断云台"卡顿"出在**指令供应**还是**执行端**。
+/// 确认结论后，删除本资源、`log_cmd_rate` 系统及其注册即可。
+#[derive(Resource, Default)]
+pub struct TalosCmdStats {
+    /// 本统计窗口内 `process_subscription` 被调度的次数。
+    /// 该系统仅在自瞄开启时运行，所以它 = "本窗口内仿真**期望**消费指令的帧数"。
+    frames: u64,
+    /// 本窗口内收到的**新**指令条数（靠指纹比对去重，见下）。
+    new_cmds: u64,
+    /// 上一条指令的指纹；相同即视为"槽位没更新、重复读到的同一条旧指令"。
+    last_cmd_key: Option<(u64, [u32; 3], u8)>,
+    /// 最近一次收到的指令（供日志展示，确认数据确实在变）。
+    latest_cmd: Option<GimbalCmd>,
+    /// 距下次打印累计的时长（秒）。
+    window_secs: f32,
+}
+
 /// 捕获插件配置：分辨率与视场角（fov）。
 pub struct TalosPluginConfig {
     pub width: u32,
@@ -152,6 +169,11 @@ impl Plugin for TalosPlugin {
             process_subscription
                 .run_if(|enabled: Res<SubscribeAutoAim>| enabled.load(Ordering::Acquire)),
         );
+
+        // 【调试·临时】指令到达率统计：每秒打印一次"新指令/s vs 帧/s"。
+        // 用于确认云台卡顿到底出在指令供应还是执行端；确认后连同上面两项一起删除。
+        app.init_resource::<TalosCmdStats>();
+        app.add_systems(Last, log_cmd_rate.after(process_subscription));
     }
 }
 
@@ -161,6 +183,8 @@ fn process_subscription(
     context: Option<Res<TalosSubscriberRes>>,
     // `Commands`：延迟命令队列——这里排队的改动在系统结束后的 apply 阶段才生效。
     mut commands: Commands,
+    // 【调试·临时】指令到达率统计。
+    mut stats: ResMut<TalosCmdStats>,
     // `Single<数据, 过滤器>`：等价于"必须恰好命中一个实体"的 Query，命中 0 或多个会
     // 报错跳过。过滤器四件套锁定"本机受控、纯云台实体"：
     // With 要求挂有该组件，Without 要求没有（云台实体不带底盘/发射口组件，以此区分）。
@@ -174,6 +198,9 @@ fn process_subscription(
         ),
     >,
 ) {
+    // 【调试·临时】本系统仅在自瞄开启时被调度，故每加一次 = 一帧"应该消费指令"的机会。
+    stats.frames += 1;
+
     // 捕获上下文
     let Some(ctx) = context else {
         return;
@@ -181,9 +208,28 @@ fn process_subscription(
     let (gimbal_entity, tracker) = gimbal.into_inner(); // Single 取内部元组
 
     // `recv_gimbal_cmd` 返回 Option：本帧没收到新指令就不做任何事。
+    // ⚠ 注意：网络/共享内存订阅端返回的是"槽位里最近一条指令"，槽位没更新时会**重复返回同一条**，
+    // 所以下面不靠"返回 Some"计数，而是对指令做指纹比对，只有指纹变化才算一条**新**指令。
     let Some(cmd) = recv_gimbal_cmd(&ctx) else {
         return;
     };
+
+    // 【调试·临时】指令指纹 = 出解算时刻 + 载荷比特。视觉端出一次新解算 → 指纹必变；
+    // 槽位没更新 → 指纹不变、不计入。用 `to_bits` 比对是为了避开浮点 NaN 比较问题。
+    let cmd_key = (
+        cmd.timestamp_ns,
+        [
+            cmd.yaw_deg.to_bits(),
+            cmd.pitch_deg.to_bits(),
+            cmd.distance_m.to_bits(),
+        ],
+        cmd.fire_advice,
+    );
+    if stats.last_cmd_key != Some(cmd_key) {
+        stats.last_cmd_key = Some(cmd_key);
+        stats.new_cmds += 1;
+    }
+    stats.latest_cmd = Some(cmd);
 
     // `distance_m == -1.0` 是解算器"No solution"的哨兵值（单位米）：
     // 移除跟踪目标，让 PID 云台闭环停下（见 main.rs 里 gimbal_pid_controls 的门控）。
@@ -210,6 +256,48 @@ fn process_subscription(
                 .entity(gimbal_entity)
                 .insert(GimbalAimTracker::new(target));
         }
+    }
+}
+
+/// 【调试·临时】每秒打印一次自瞄指令到达率，用于判断"卡顿"出在**指令供应**还是**执行端**。
+///
+/// 判读方法：
+/// - `新指令/s` 明显低于 `帧/s`（例如 帧 100/s、指令 20/s）→ **视觉端出指令慢**，云台只能"走走停停"；
+/// - 两者接近（每帧都有新指令）→ 指令供应充足，卡顿不在这一环，要往 PID 之前的链路找；
+/// - `帧/s` 本身很低 → 自瞄开启时被门控的帧本来就不多，瓶颈在功能开关或帧率。
+///
+/// 确认结论后，删除本系统、`TalosCmdStats` 资源及注册即可。
+fn log_cmd_rate(time: Res<Time>, mut stats: ResMut<TalosCmdStats>) {
+    stats.window_secs += time.delta_secs();
+    if stats.window_secs < 1.0 {
+        return; // 不够一秒，继续累计
+    }
+    let secs = stats.window_secs;
+    stats.window_secs = 0.0;
+    // 取走并清零本窗口计数（下一窗口重新累计）。
+    let frames = std::mem::take(&mut stats.frames);
+    let new_cmds = std::mem::take(&mut stats.new_cmds);
+
+    if frames == 0 {
+        info!("auto-aim cmd rate: 本窗口自瞄未开启（process_subscription 0 帧被调度）");
+        return;
+    }
+
+    let frames_hz = frames as f32 / secs;
+    let cmds_hz = new_cmds as f32 / secs;
+    // 新鲜度 = 多少比例的帧拿到了**新**指令；100% 表示每帧都有新解算结果。
+    let fresh_pct = new_cmds as f32 / frames as f32 * 100.0;
+
+    match stats.latest_cmd {
+        Some(cmd) => info!(
+            "auto-aim cmd rate: 新指令 {cmds_hz:.1}/s | 帧 {frames_hz:.1}/s | 每帧新鲜度 {fresh_pct:.0}% \
+             | 最近 yaw={:.2} pitch={:.2} dist={:.3} fire={}",
+            cmd.yaw_deg, cmd.pitch_deg, cmd.distance_m, cmd.fire_advice
+        ),
+        None => info!(
+            "auto-aim cmd rate: 新指令 {cmds_hz:.1}/s | 帧 {frames_hz:.1}/s | 每帧新鲜度 {fresh_pct:.0}% \
+             | 尚未收到任何指令（订阅端槽位为空）"
+        ),
     }
 }
 
@@ -277,8 +365,10 @@ pub fn to_ros(bevy_transform: Transform) -> Transform {
 /// 平移向量 Bevy→ROS：直接左乘对齐矩阵 `M`。
 /// 单位沿用输入（本项目世界坐标单位是**米**），此处只做轴重排/符号翻转，不改变尺度。
 pub fn to_ros_translation(vec3: Vec3) -> Vec3 {
-    let align_rot_mat = M_ALIGN_MAT3;
+    let align_rot_mat = M_ALIGN_MAT3;   // 对齐旋转矩阵
+    // 直接左乘对齐矩阵，即可得到 ROS 坐标系下的向量。
     let new_translation = align_rot_mat * vec3;
+    // 单位沿用输入（本项目世界坐标单位是**米**），此处只做轴重排/符号翻转，不改变尺度。
     new_translation
 }
 
@@ -286,9 +376,13 @@ pub fn to_ros_translation(vec3: Vec3) -> Vec3 {
 /// 这是"换基"公式——把同一个物理旋转在另一套坐标轴下重新表达：
 /// 左乘 A 转到新轴，右乘 A⁻¹ 再把作用轴还原，净效果是坐标轴整体转了 M。
 pub fn to_ros_quat(quat: Quat) -> Quat {
-    let align_rot_mat = M_ALIGN_MAT3;
+    let align_rot_mat = M_ALIGN_MAT3;   // 对齐旋转矩阵
     // `Quat::from_mat3`：由 3x3 旋转矩阵转出等价四元数；`.inverse()` 求逆（单位四元数即共轭）。
     let align_quat = Quat::from_mat3(&align_rot_mat);
+    // 为什么是这个公式？因为 Bevy 的四元数是右手系，ROS 是左手系。
+    // 所以需要先左乘对齐四元数，再右乘对齐四元数的逆，才能得到 ROS 坐标系下的四元数。（线性代数证明格式就是如果从一个坐标系旋转到另一个坐标系，需要先左乘旋转矩阵，再右乘旋转矩阵的逆。）
+    // new_rotation： ROS 坐标系下的四元数
     let new_rotation = align_quat * quat * align_quat.inverse();
+    // 单位沿用输入（本项目世界坐标单位是**四元数**），此处只做轴重排/符号翻转，不改变尺度。
     new_rotation
 }

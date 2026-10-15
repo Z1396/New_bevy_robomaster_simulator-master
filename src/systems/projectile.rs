@@ -49,7 +49,7 @@ pub fn setup_projectile(
 /// 本机开火：受冷却限制，从炮口沿视线方向生成一颗子弹（PostUpdate）。
 pub fn projectile_launch(
     time: Res<Time>,     // 时间资源，用于获取当前时间。
-       mut cooldown: ResMut<ProjectileCooldown>,     // 冐却计时器，用于限制发射频率。
+       mut cooldown: ResMut<ProjectileCooldown>,     // 冷却计时器，用于限制发射频率。
     mut stats: ResMut<ProjectileStatistics>,     // 子弹统计组件，用于记录弹丸飞行时间。
     config: Res<SimulationConfig>,// 仿真配置资源，用于获取直径、速度等参数。   
     _asset_server: Res<AssetServer>,// 资产服务器，用于加载 glTF 资产。
@@ -71,7 +71,7 @@ pub fn projectile_launch(
         (&Transform, &LinearVelocity, &AngularVelocity),
         (With<Infantry>, With<Controlled>),
     >,
-    // 获取云台实体的全局变换组件，用于获取全局位置、旋转、缩放。不筛选 Chassis 组件，因为 Chassis 是机器人实体，不是云台实体。
+    // 获取云台实体的全局变换组件，用于获取全局位置、旋转、缩放。`Without<InfantryChassis>` 把底盘/根实体排除（InfantryChassis 挂在机器人实体上，不是云台实体）。
     gimbal: Single<
         (&GlobalTransform, &InfantryGimbal),
         (With<Controlled>, Without<InfantryChassis>),
@@ -142,7 +142,7 @@ pub fn projectile_launch(
 /// 空气阻力（FixedUpdate）：按 v² 的阻力公式施力，让弹道逐渐下坠。
 pub fn projectile_aerodynamics(
     config: Res<SimulationConfig>, // 模拟配置组件，用于获取弹丸参数。
-    // `Without<DartProjectile>`：飞镖不参与空气阻力（它用另一套常量）。
+    // `Without<DartProjectile>`：飞镖不参与空气阻力（dart_launch 未对其施加任何气动力）。
     mut projectiles: Query<Forces, (With<Projectile>, Without<DartProjectile>)>,
 ) {
     // 获取空气阻力参数。
@@ -157,7 +157,7 @@ pub fn projectile_aerodynamics(
     if diameter <= 0.0 {
         return;
     }
-    // 各参数取下限 0，避免配置异常导致符号翻转或除零。
+    // 各参数取下限 0，避免配置异常导致阻力符号翻转（负阻力会变成加速）。
     let air_density = aero.air_density.max(0.0);// 空气密度，单位 kg/m³。
     let drag_coefficient = aero.drag_coefficient.max(0.0);// 阻力系数，单位无。
     if air_density == 0.0 || drag_coefficient == 0.0 {
@@ -167,7 +167,7 @@ pub fn projectile_aerodynamics(
     // 迎风面积 = π r²（球体投影面积）；`k = 0.5 · ρ · Cd · A`。
     let area = PI * (diameter * 0.5).powi(2);// 投影面积，单位 m²。
     let wind = Vec3::new(aero.wind[0], aero.wind[1], aero.wind[2]);// 风速，单位 m/s。
-    let k = 0.5 * air_density * drag_coefficient * area;// 阻力系数，单位 kg/m³。
+    let k = 0.5 * air_density * drag_coefficient * area;// 阻力常量 k，单位 kg/m。
 
     // 遍历所有子弹实体。
     for mut forces in projectiles.iter_mut() {
@@ -175,7 +175,7 @@ pub fn projectile_aerodynamics(
         let v_rel = forces.linear_velocity() - wind;// 相对风速，单位 m/s。
         let speed = v_rel.length();// 相对速度，单位 m/s。
         if speed <= 1e-3 {
-            continue; // 近静止时无需施加阻力，也避免除零/无意义的零向量
+            continue; // 近静止时无需施加阻力，也避免对零向量做无意义的运算
         }
         // 施加阻力力。
         // `apply_force`：将力应用到刚体上，单位 kg·m/s²。
@@ -204,7 +204,7 @@ pub fn dart_launch(
     const DART_SPAWN_OFFSET_M: f32 = 0.00; // m（出膛前移量）
 
     // 获取发射位实体的全局变换组件，用于获取全局位置、旋转、缩放。
-    // `single()`：确保只有 1 个发射位实体，否则会 panic。
+    // `single()`：要求恰好 1 个发射位实体；0 个或多个时返回 Err，由下面的 let-else 优雅退出（不 panic）。
     let Ok(launcher) = launchers.single() else {
         return; // 0 个或多个发射位都放弃发射
     };

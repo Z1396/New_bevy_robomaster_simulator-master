@@ -1,7 +1,7 @@
 //! 共享内存发布端（生产者侧 API）——把仿真数据写进共享内存，供视觉程序读取。
 //!
 //! 【教学】本文件是"发布/订阅"模型的**发布端**：
-//! - 老数据（位姿/图像）走三缓冲（`TripleBufferProducer`），写入互不阻塞、读者拿最新；
+//! - 大数据（位姿/图像）走三缓冲（`TripleBufferProducer`），写入互不阻塞、读者拿最新；
 //! - 简单数据（相机内参、底盘观测、真值、运行状态）直接整块覆盖写对应字段——
 //!   它们要么低频、要么天然可容忍短暂撕裂，无需三缓冲；
 //! - 全文件对共享内存的访问都在 `unsafe` 块内：把裸内存强行当作 `ShmMetaRegion` 解释，
@@ -168,9 +168,9 @@ impl ShmPublisher {
     /// `position` 单位米、`quaternion` 为 `[w,x,y,z]`、`frame_seq`、`timestamp_ns`（纳秒）。
     pub fn publish_pose(
         &mut self,
-        index: PoseIndex,   // 位姿索引，0..=Camera。
-        position: [f32; 3],// 位置姿，单位米。
-        quaternion: [f32; 4],// 四元数姿，单位无。
+        index: PoseIndex,   // 位姿索引，0..=4（见 PoseIndex）。
+        position: [f32; 3],// 位置，单位米。
+        quaternion: [f32; 4],// 四元数，单位无。
         frame_seq: u64,     // 本帧递增序号，接收端用它判新旧、丢乱序。
         timestamp_ns: u64,// 采集时刻，单位纳秒。
     ) {
@@ -189,9 +189,9 @@ impl ShmPublisher {
     /// `frame_seq`、`timestamp_ns`（纳秒）。
     pub fn publish_pose_with_aux(
         &mut self,
-        index: PoseIndex,   // 位姿索引，0..=Camera。
-        position: [f32; 3],// 位置姿，单位米。
-        quaternion: [f32; 4],// 四元数姿，单位无。
+        index: PoseIndex,   // 位姿索引，0..=4（见 PoseIndex）。
+        position: [f32; 3],// 位置，单位米。
+        quaternion: [f32; 4],// 四元数，单位无。
         aux_f32: [f32; 4],// 辅助数据，单位无。
         frame_seq: u64,     // 本帧递增序号，接收端用它判新旧、丢乱序。
         timestamp_ns: u64,// 采集时刻，单位纳秒。

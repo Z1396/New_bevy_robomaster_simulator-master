@@ -23,7 +23,7 @@ pub fn spin_display_vehicle(
     // 匹配到的通常只有一台展示战车；写成循环是为了将来支持多台。
     for (mut angular_velocity, mut damping) in &mut spinning {
         damping.0 = 0.0; // 阻尼清零，保证自转匀速不被衰减
-        // 角速度单位弧度/秒：绕世界 Y 轴以 5 rad/s 匀速自转。
+        // 角速度单位弧度/秒：绕世界 Y 轴以 10 rad/s 匀速自转。
         angular_velocity.0 = Vec3::new(0.0, 10.0, 0.0);
     }
 }

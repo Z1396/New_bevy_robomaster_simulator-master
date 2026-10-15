@@ -90,11 +90,10 @@ impl ChassisSpinMode {
 
 /// 单台设备的"本帧输入"快照。轴向量均已归一化到 -1..1。
 #[derive(Clone, Copy, Debug, PartialEq)]
-/// 控制器输入快照（本帧）
 pub struct ControllerInput {
     pub movement: Vec2,     // 底盘平移 (x=右/左, y=前/后)
     pub gimbal: Vec2,       // 云台转动 (x=yaw, y=pitch)
-    pub chassis_yaw: f32,   // 底盘自转输入（小陀螺/方向键）
+    pub chassis_yaw: f32,   // 底盘自转输入（小陀螺）
     pub chassis_roll: f32,  // 底盘横滚输入
     pub chassis_pitch: f32, // 底盘俯仰输入
     pub boost: bool,        // 加速（按住）
@@ -166,7 +165,8 @@ impl ControllerInput {
 /// 全局控制器状态（资源）。`controlled`/`remote` 是每帧重建的输入快照；
 /// 其余字段是**跨帧保持**的开关/状态（如小陀螺开关、帮助文本、当前手柄）。
 #[derive(Resource, Debug, Default)]
-pub struct ControllerState {
+pub struct ControllerState {// 全局控制器状态（资源）
+    /// 控制的输入快照（本帧）
     pub controlled: ControllerInput,     // 控制的输入快照（本帧）
     pub remote: ControllerInput,         // 远程的输入快照（本帧）
     keyboard_auto_aim: bool,             // F5 切换的键盘自瞄开关
@@ -183,8 +183,7 @@ impl ControllerState {
         self.remote = ControllerInput::default();     // 清空远程的输入快照
     }
 
-    /// 自瞄是否激活：键盘开关或手柄扳机任一为真。keyboard_auto_aim 控制的输入快照的 auto_aim
-    /// controlled.auto_aim 控制的输入快照的 auto_aim 任一为真即为真
+    /// 自瞄是否激活：键盘开关或手柄扳机任一为真。
     pub fn auto_aim_active(&self) -> bool {
         self.keyboard_auto_aim || self.controlled.auto_aim 
     }
@@ -231,12 +230,12 @@ impl ControllerState {
         self.keyboard_auto_aim = !self.keyboard_auto_aim; // 切换键盘自瞄开关状态
     }
 
-    /// 切换控制的底盘小陀螺开关：LSHIFT 键。
+    /// 切换控制的底盘小陀螺开关：Q 键。
     fn toggle_controlled_chassis_spin(&mut self) {
         self.controlled_chassis_spin.toggle(); // 切换控制的底盘小陀螺开关状态
     }
 
-    /// 切换远程的底盘小陀螺开关：RSHIFT 键。   
+    /// 切换远程的底盘小陀螺开关：U 键。
     fn toggle_remote_chassis_spin(&mut self) {
         self.remote_chassis_spin.toggle(); // 切换远程的底盘小陀螺开关状态  
     }
@@ -266,14 +265,14 @@ pub fn clear_controller_input(mut controller: ResMut<ControllerState>) {
 
 /// 键盘采样：把按键映射成两个 `ControllerInput` 快照。
 pub fn sample_keyboard_controller(
-    // 键盘输入快照ButtonInput<KeyCode>表示键盘按键的输入状态，每个元素表示对应按键的输入状态，范围是[-1.0, 1.0]
-    // KeyCode 是32个按键的枚举类型，每个元素表示对应按键的输入状态
+    // `ButtonInput<KeyCode>`：键盘按键状态资源，记录每个按键当前是否被按下（布尔量，不是 -1..1 的模拟轴）
+    // `KeyCode`：键盘按键枚举（字母/数字/功能键/方向键等，远不止 32 个）
     keyboard: Res<ButtonInput<KeyCode>>,  
     // 控制器状态资源，包含控制的输入快照（本帧）和远程的输入快照（本帧）
     mut controller: ResMut<ControllerState>,
 ) {
     // 有键盘动作就切到键盘帮助、清掉手柄焦点（表示当前用键盘操作）。
-    // keyboard_controller_active(&keyboard);创建22个按键的输入快照，返回bool值，true表示有键盘动作，false表示没有键盘动作
+    // keyboard_controller_active(&keyboard)：检查持续键（22 个）与触发键（6 个）是否有动作，返回 bool（true=键盘正被使用）
     let keyboard_used = keyboard_controller_active(&keyboard);
     if keyboard_used {
         //use_help这个api意思是切换到键盘帮助文本(键盘帮助文本：W/A/S/D 移动，箭头键 云台，空格 射击，G 飞镖，Tab 切换，F3 切换相机，Q/U 切换小陀螺开关)用于可视化显示当前操作模式
@@ -298,8 +297,8 @@ pub fn sample_keyboard_controller(
     // add_movement这个api意思是添加键盘移动输入到控制的输入快照中，参数是W/A/S/D键的输入向量
     // 每个元素表示对应方向的输入，范围是[-1.0, 1.0]
     // 如果没有对应键，输入为0.0
-    // 最后返回3个轴的输入向量
-    // 0个轴表示前向移动，1个轴表示向左移动，2个轴表示向右移动
+    // 最后返回 2 个轴的输入向量（Vec2）
+    // x 轴表示右/左移动，y 轴表示前/后移动
     controlled.add_movement(keyboard_vec2(
         &keyboard,
         KeyCode::KeyW,
@@ -307,7 +306,7 @@ pub fn sample_keyboard_controller(
         KeyCode::KeyS,
         KeyCode::KeyD,
     ));
-    // 同上，添加云台输入到控制的输入快照中，参数是箭头键的输入向量
+    // 添加底盘自转输入（小陀螺开关产生的 yaw）到控制的输入快照中（add_chassis 第一个参数是 yaw）
     controlled.add_chassis(controlled_chassis_yaw, 0.0, 0.0);
     // 同上，添加云台输入到控制的输入快照中，参数是箭头键的输入向量
     // 每个元素表示对应方向的输入，范围是[-1.0, 1.0]
@@ -328,7 +327,7 @@ pub fn sample_keyboard_controller(
     controlled.boost |= keyboard.pressed(KeyCode::ShiftLeft); // `|=`：键盘或手柄任一为真即为真
     controlled.shoot |= keyboard.pressed(KeyCode::Space);       // 空格键射击
     controlled.dart_just_pressed |= keyboard.just_pressed(KeyCode::KeyG); // G键飞镖
-    controlled.switch_slapper_just_pressed |= keyboard.just_pressed(KeyCode::Tab);  // Tab键切换小陀螺开关
+    controlled.switch_slapper_just_pressed |= keyboard.just_pressed(KeyCode::Tab);  // Tab键切换操控车（哪台 AI 车被选中）
     controlled.switch_camera_just_pressed |= keyboard.just_pressed(KeyCode::F3); // F3键切换相机
 
     // ---- 遥控车（remote，IJKL 控制）----
@@ -353,7 +352,7 @@ pub fn sample_keyboard_controller(
             0.0,
         ));
     }
-    // 同上，添加云台输入到控制的输入快照中，参数是F/V键的输入向量(按F键云台俯仰，按V键云台偏航)
+    // 添加遥控车云台俯仰输入（F/V 键：F = 俯仰 +，V = 俯仰 -），加到 remote 快照上
     remote.add_gimbal(Vec2::new(
         0.0,
         keyboard_axis(&keyboard, KeyCode::KeyF, KeyCode::KeyV),
@@ -453,7 +452,7 @@ pub fn update_auto_aim_subscription(
 ) {
     // active 为当前控制器状态的自瞄订阅开关状态
     let active = controller.auto_aim_active();
-    // `值：只有状态值：只有状态真正变化时才打日志（避免每帧刷屏）。
+    // 只有状态真正变化时才打日志（避免每帧刷屏）。
     // 语法解释：`swap(active, Ordering::AcqRel)`：原子交换 `enabled` 中的值为 `active`，相同则不交换、不同则交换并返回旧值
     //  - `Ordering::AcqRel`：确保读取到的旧值是最新值（`Acquire`），并确保后续写入（`Release`）按顺序执行
     if enabled.swap(active, Ordering::AcqRel) != active {
@@ -624,9 +623,9 @@ fn apply_stick_deadzone(input: Vec2) -> Vec2 {
     input / length * scaled
 }
 
-/// 把向量的两个分量各自夹到 -1..1（不改变方向，只压长度）。
+/// 把向量的两个分量各自夹到 -1..1（各轴独立截断，越界分量被压回边界）。
 fn clamp_axes_vec2(input: Vec2) -> Vec2 {
-    // clamp(-1.0, 1.0)：把输入限制在 [-1,1] 范围内，不改变方向。
+    // clamp(-1.0, 1.0)：把每个分量限制在 [-1,1] 范围内（各轴独立截断）。
     Vec2::new(input.x.clamp(-1.0, 1.0), input.y.clamp(-1.0, 1.0))
 }
 

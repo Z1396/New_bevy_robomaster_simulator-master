@@ -68,7 +68,7 @@ impl Default for WindowConfig {
 }
     
 #[derive(Deserialize, Reflect, Clone)]
-// 结构体级 `#[serde(default)]`：任何缺失字段都用各自类型的默认值补齐。
+// 结构体级 `#[serde(default)]`：小节内缺失的字段用本结构体 `Default` 实现里的值补齐。
 #[serde(default)]
 pub struct DebugConfig {
     // 是否启用 egui 调试界面（总开关）。

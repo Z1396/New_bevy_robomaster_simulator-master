@@ -370,15 +370,17 @@ fn extract_pose_data(
     pose_data.valid = true;
 }
 
+/// 组装本帧所有位姿/观测
 fn captured_pose_data(
-    cam_transform: &GlobalTransform,
-    gimbal_transform: &GlobalTransform,
-    muzzle_global: &GlobalTransform,
-    muzzle_local: &Transform,
-    chassis_obs: &ChassisObservationFrame,
-    frame_seq: u64,
-    timestamp_ns: u64,
-) -> CapturedPoseData {
+    cam_transform: &GlobalTransform, // 捕获相机世界变换
+    gimbal_transform: &GlobalTransform, // 本机云台世界变换
+    muzzle_global: &GlobalTransform, // 枪口世界变换
+    muzzle_local: &Transform, // 枪口局部变换
+    chassis_obs: &ChassisObservationFrame, // 本帧底盘观测（速度/加速度等）
+    frame_seq: u64, // 本帧序号
+    timestamp_ns: u64, // 本帧时间戳（纳秒）
+) -> CapturedPoseData // 本帧所有位姿/观测
+{
     // `reparented_to`：求出"若把 self 挂到另一变换之下"得到的相对变换。
     // 于是 `cam_rel` = 相机相对云台的位姿，`muzzle_rel` = 枪口相对云台的位姿（单位米）。
     let cam_rel = cam_transform.reparented_to(gimbal_transform);
@@ -439,33 +441,33 @@ fn publish_pose_data(
     publisher: &mut TalosIpcPublisher,
     frame_seq: u64,
     timestamp_ns: u64,
-    pose: &CapturedPoseData,
+    pose: &CapturedPoseData, // 本帧所有位姿/观测
 ) {
     // Odom 槽：云台世界位置 + 单位四元数 `[1,0,0,0]`（位置槽不带旋转，故给恒等旋转）。
     publisher.publish_pose(
-        PoseIndex::Odom,
-        pose.gimbal_ros,
-        [1.0, 0.0, 0.0, 0.0],
+        PoseIndex::Odom, // index odom 云台在世界坐标系位置
+        pose.gimbal_ros, // 云台世界位置
+        [1.0, 0.0, 0.0, 0.0], // 云台世界旋转四元数
         frame_seq,
         timestamp_ns,
     );
 
     // Gimbal 槽：位置置零（原点即云台），只发朝向四元数。
     publisher.publish_pose(
-        PoseIndex::Gimbal,
-        [0.0, 0.0, 0.0],
-        pose.gimbal_quat,
-        frame_seq,
-        timestamp_ns,
+        PoseIndex::Gimbal, // index gimbal 云台朝向四元数都是ros坐标系
+        [0.0, 0.0, 0.0], // 云台世界位置
+        pose.gimbal_quat, // 云台世界旋转四元数
+        frame_seq, // 本帧序号
+        timestamp_ns, // 本帧时间戳
     );
 
     // Muzzle 槽：枪口相对云台的位置 + 单位四元数。
     publisher.publish_pose(
         PoseIndex::Muzzle,
-        pose.muzzle_rel,
-        [1.0, 0.0, 0.0, 0.0],
-        frame_seq,
-        timestamp_ns,
+        pose.muzzle_rel, // 枪口相对云台的位置
+        [1.0, 0.0, 0.0, 0.0], // 枪口世界旋转四元数
+        frame_seq, // 本帧序号
+        timestamp_ns, // 本帧时间戳
     );
 
     // Camera 槽：相机相对云台的位置 + 单位四元数。
@@ -481,24 +483,23 @@ fn publish_pose_data(
     let mut observation = pose.chassis_observation;
     observation.frame_seq = frame_seq;
     observation.timestamp_ns = timestamp_ns;
-    publisher.publish_chassis_observation(observation);
+    publisher.publish_chassis_observation(observation); // 发布底盘观测
 
-    // Legacy compatibility path for consumers still reading pose slot 4.
     // 兼容旧消费者：把底盘观测的关键量塞进 PoseIndex::ChassisObservation(4) 槽的
     // position 与 aux_f32 两个数组（新代码应改读上面的 chassis_observation 通道）。
     publisher.publish_pose_with_aux(
-        PoseIndex::ChassisObservation,
+        PoseIndex::ChassisObservation, // index chassis_observation 底盘观测
         [
-            observation.v_body[0],
-            observation.v_body[1],
-            observation.wz_radps,
+            observation.v_body[0], // vx
+            observation.v_body[1], // vy
+            observation.wz_radps, // wz
         ], // position 复用为 [vx, vy, wz]
         observation.wheel_angular_radps, // quaternion 复用为四轮角速度
         [
-            observation.a_body[0],
-            observation.a_body[1],
-            observation.alpha_z_radps2,
-            observation.dt_s,
+            observation.a_body[0], // ax
+            observation.a_body[1], // ay
+            observation.alpha_z_radps2, // alpha_z
+            observation.dt_s, // dt
         ], // aux 复用为 [ax, ay, alpha_z, dt]
         frame_seq,
         timestamp_ns,

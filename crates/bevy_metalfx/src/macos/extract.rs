@@ -8,8 +8,8 @@ use crate::{MetalFxResetHistory, MetalFxTemporalUpscaling};
 
 use super::context::MetalFxContext;
 
-/// Wall-clock delta of the frame being rendered; `MTLFXFrameInterpolator` needs it to place the
-/// interpolated frame in time.
+/// Delta of the frame being rendered, taken from Bevy's generic `Time` (game time, not
+/// wall-clock); `MTLFXFrameInterpolator` needs it to place the interpolated frame in time.
 #[derive(Resource, Default)]
 pub(super) struct MetalFxFrameDelta(pub f32);
 

@@ -69,12 +69,16 @@ fn rune_mode_to_u8(m: &RuneMode) -> u8 {
 /// The alignment matrix maps Bevy (Y-up) → ROS (Z-up).
 /// We convert the rotation quaternion through the alignment to extract the Z-up yaw.
 /// 返回值单位：**弧度**。做法：把旋转经 `M_ALIGN_MAT3` 换到 ROS 系后，取其绕 ROS Z 轴
-/// 的偏航角（下称 `yaw`）——ZYX 欧拉分解的第三分量即 yaw。
+/// 的偏航角（下称 `yaw`）。
+/// ⚠ 注意：**当前实现取到的并不是 yaw**，而是绕 X 轴的角（roll），详见函数体内注释。
 fn ros_yaw(global_tf: &GlobalTransform) -> f32 {
     let align_quat = Quat::from_mat3(&M_ALIGN_MAT3);
     // 换基：A * q * A⁻¹（同 plugin.rs 的 to_ros_quat 思路）。
     let ros_rot = align_quat * global_tf.rotation() * align_quat.inverse();
-    // `to_euler(EulerRot::ZYX)` 返回 (z, y, x) 三个角；正好忽略前两个、取第三个 yaw。
+    // `to_euler(EulerRot::ZYX)` 按 glam 约定返回 `(z, y, x)`：**第一个**分量才是绕 Z 轴
+    // 的角（ROS 系即 yaw），第三个是绕 X 轴的角（roll）。
+    // ⚠ 疑似 bug：此处取第三个分量，实际拿到的是 roll——纯偏航运动下本函数恒返回 ≈0。
+    // 若意图是取 ROS 系 yaw，应改为 `let (yaw, _, _) = ros_rot.to_euler(EulerRot::ZYX);`。
     let (_, _, yaw) = ros_rot.to_euler(EulerRot::ZYX);
     yaw
 }

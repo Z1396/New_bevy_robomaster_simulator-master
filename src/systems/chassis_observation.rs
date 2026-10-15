@@ -19,14 +19,12 @@ const MIN_RADIUS_M: f32 = 1e-6;
 /// 每帧发布一次的底盘观测帧（全局资源）。字段命名后缀即单位：
 /// `_s`=秒、`_mps`=米/秒、`_radps`=弧度/秒、`_m`=米、`_rad`=弧度、`_mps2`=米/秒²。
 #[derive(Resource, Debug, Clone)]
-pub struct ChassisObservationFrame {
+pub struct ChassisObservationFrame {// 底盘运动学观测帧（全局资源）
     pub stamp_s: f64,     // 采样时刻（秒）
     pub dt_s: f32,        // 距上一帧的间隔（秒）
     pub v_body: Vec2,     // 机身系线速度 (x=前, y=左)，单位 m/s
     pub wz_radps: f32,    // 机身系绕 Z 轴角速度（偏航率），单位 rad/s
-    // Wheel order: [FL, FR, RL, RR]
     pub wheel_linear_mps: [f32; NUM_WHEELS], // 四轮线速度（m/s），顺序 [前左, 前右, 后左, 后右]
-    // Wheel order: [FL, FR, RL, RR]
     pub wheel_angular_radps: [f32; NUM_WHEELS], // 四轮角速度（rad/s）
     pub a_body: Vec2,           // 机身系线加速度 (x=前, y=左)，单位 m/s²
     pub alpha_z_radps2: f32,    // 偏航角加速度（rad/s²）
@@ -86,7 +84,7 @@ pub fn update_chassis_observation(
     let rotation = chassis_tf.compute_transform().rotation;// 车身旋转矩阵
 
     // 中译：先把世界系速度旋到车身本地系（`rotation.inverse() * v`），再把 Bevy 轴
-    //（右, 上, 后）× 重映射为机体轴（前, 左, 上）。
+    //（右, 上, 后）重映射为机体轴（前, 左, 上）。
     let linear_local_bevy = rotation.inverse() * linear_velocity.0;
     let linear_body = bevy_local_to_body(linear_local_bevy);
     let v_body = Vec2::new(linear_body.x, linear_body.y);
@@ -175,7 +173,8 @@ fn bevy_local_to_body(vector: Vec3) -> Vec3 {
 
 /// Bevy 本地轴系 → 机体轴系的旋转共轭变换：`align · rotation · align⁻¹`。
 fn bevy_to_body_quat(rotation: Quat) -> Quat {
-    // `from_cols` 按列给出"对齐基"：机体前/左/上在 Bevy 系中的方向。
+    // `from_cols` 按列给出对齐矩阵：列为 Bevy 各轴（右/上/后）在机体系下的方向，
+    // 即把 Bevy 系向量重映射到机体系的旋转（与 bevy_local_to_body 同一变换）。
     let align = Quat::from_mat3(&Mat3::from_cols(
         Vec3::new(0.0, -1.0, 0.0),
         Vec3::new(0.0, 0.0, 1.0),
@@ -237,7 +236,7 @@ mod tests {
         approx_eq(linear[0], linear[3]);
     }
 
-    /// 纯自转时四轮转速应呈对角同号的麦轮特征。
+    /// 纯自转时同侧两轮转速应相同、左右两侧符号相反（麦轮旋转特征）。
     #[test]
     fn inverse_spin_motion_has_expected_pattern() {
         let cfg = test_cfg();

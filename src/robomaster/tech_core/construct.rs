@@ -1,4 +1,4 @@
-//! 科技核心（能量机关）的状态机与灯光程序——本组最大、最复杂的文件。
+//! 科技核心（Tech Core）的状态机与灯光程序——本组最大、最复杂的文件。
 //!
 //! 一句话职责：读一场比赛里"科技核心"当前处于哪个阶段（`TechCorePhase`），据此把红/蓝双方
 //! 三组灯的材质换成对应颜色/闪烁/流光，并对外导出一份描述当前灯光状态的 JSON（供上位机/裁判系统读取）。
@@ -233,7 +233,7 @@ impl TechCoreFirstLightSegment {
         Self(index.min(FIRST_LIGHT_SEGMENT_COUNT - 1))
     }
 
-    /// 弧度版的便捷封装：入参 `degrees` 单位：**度**，内部转成弧度再套用 `from_angle_radians`。
+    /// 度版的便捷封装：入参 `degrees` 单位：**度**，内部转成弧度再套用 `from_angle_radians`。
     pub fn from_angle_degrees(degrees: f64) -> Self {
         Self::from_angle_radians(degrees.to_radians())
     }
@@ -281,7 +281,7 @@ impl TechCoreStep5Lights {
 }
 
 impl Default for TechCoreStep5Lights {
-    /// 默认：目标段 = 第 1 段；能量单元段 = 正对面那一段（第 `18/2=9` 段）。
+    /// 默认：目标段 = 第 1 段；能量单元段 = 正对面那一段（0 基下标 `18/2=9`，即第 10 段）。
     /// `unwrap()` 在这里安全：索引由常量算出且必定在合法范围。
     fn default() -> Self {
         Self {
@@ -424,7 +424,7 @@ fn step5_active_segments_json(
 /// - `MatchRunningIdle`：比赛进行中、机关空闲（未开始挑战）——初始态；
 /// - `DifficultySelectedArmNotReady`：已选难度、机关"臂"未就绪——第 1 组跑马灯流动示意；
 /// - `DifficultySelectedArmReady`：臂已就绪、可击打——三组整组 1Hz 闪烁；
-/// - `Step2Completed`/`Step3Completed`/`Step4Completed`：第 2/3/4 步先后完成（闪烁频率随之提升）；
+/// - `Step2Completed`/`Step3Completed`/`Step4Completed`：第 2/3/4 步先后完成（第 2/3 步闪烁频率逐步提升，第 4 步转为常亮）；
 /// - `Step5InProgress`：第五步组装进行中——第 1 组按目标/能量单元段引导；
 /// - `Step5Completed`：第五步完成——目标段变绿；
 /// - `ConfirmedRecovering`：确认恢复中——三组 3Hz 快闪。
@@ -839,7 +839,7 @@ impl FirstLightSet {
             return;
         }
 
-        // 先把整组涂灭，再点亮活跃段——这样每帧只改动少量段。
+        // 先把整组涂灭，再点亮活跃段——保证上一帧点亮的段在本帧熄灭。
         self.assign_all(handles.off.clone(), children, mesh_materials);
         let active_handle = handles.resolve_color(team, color);
 
@@ -1153,7 +1153,7 @@ impl TechCoreMaterialHandles {
 }
 
 /// 构造"自发光"材质的工具：`base_color` 是基础色，`emissive` 由色值 × `emissive_strength` 得到。
-/// 入参 `red/green/blue`：线性 sRGB 色分量；`emissive_strength`：自发光强度（0 = 不发光，越大越亮）。
+/// 入参 `red/green/blue`：sRGB 色分量；`emissive_strength`：自发光强度（0 = 不发光，越大越亮）。
 /// `emissive_exposure_weight = -1.0`：让发光不随相机曝光调整（保证灯色稳定）。
 fn material(red: f32, green: f32, blue: f32, emissive_strength: f32) -> StandardMaterial {
     StandardMaterial {

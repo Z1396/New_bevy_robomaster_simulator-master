@@ -50,13 +50,11 @@ substep_count = 8       # 每次物理tick的子迭代步数；步数越高物�
 rotation_speed = 7.42       # rad/s 底盘自转最大转速
 yaw_acceleration = 20.0     # rad/s² 底盘yaw角加速度，控制转向响应快慢
 tilt_rotation_speed = 3.0   # rad/s 底盘roll/pitch俯仰摆动速度
-gimbal_rotation_speed = 3.0# rad/s 云台最大旋转速度
+gimbal_rotation_speed = 5.0 # rad/s 云台最大旋转速度/相当于50°/秒，单位弧度/秒
 gimbal_pitch_limit = 0.785  # rad 云台俯仰角限位，0.785rad≈45°
 max_speed = 6.0             # m/s 底盘最大直线速度
 linear_acceleration = 6.0  # m/s² 底盘线加速度
 acceleration_exponent = 2.5 # 非线性加速度曲线指数，起步加速柔和，高速增长放缓
-# Closed-loop tracking of external auto-aim (Talos/ROS2) gimbal commands.
-# Yaw and pitch are independent loops with independent gains.
 # 云台闭环跟踪：接收Talos/ROS2瞄准指令，yaw、pitch两套独立PID
 
 [vehicle.gimbal_pid.yaw]

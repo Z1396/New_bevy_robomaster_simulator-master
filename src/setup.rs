@@ -260,7 +260,7 @@ pub fn setup_vehicle(
             Quat::IDENTITY,
             Collider::cylinder(0.2593615, 0.231298),
         )]),
-        CollisionMargin(0.005), // 碰撞余量，0.005 m 车身碰撞层：与环境碰撞时，只触发一次事件
+        CollisionMargin(0.005), // 碰撞余量，0.005 m
         vehicle_body_collision_layers, // 车身碰撞层：与环境碰撞时，只触发一次事件
         Mass(15.0),     // 车身质量，15 kg
         Restitution::new(0.01),// 弹性 0.01（几乎不反弹）
@@ -284,18 +284,25 @@ pub fn setup_vehicle(
         InfantryChassis::default(),
         ScanArmor::new(team, config.armor),
     ));
+    // exact("GIMBAL") 表示"在 VEHICLE 下再下一层找 GIMBAL"，`one()` 取"恰好一个"、
+    // 找不到返回 None——这里 `unwrap()` 是在断言"资产必须符合上述节点命名契约"。
     let gimbal = iter.exact("GIMBAL").one().unwrap();
     // 云台节点：随动于底盘但独立瞄准（`InfantryGimbal` 存 local_yaw/pitch，单位弧度）。
     commands.entity(gimbal).insert(InfantryGimbal::default());
     // 炮口与瞄准点只对"本机"（有相机的那台）有意义。
     if is_local {
+        // flatten() 把结果固化成可复用的迭代器，`exact("SHOT_DIRECTION")` 表示"在 GIMBAL 下再下一层找 SHOT_DIRECTION"，`one()` 取"恰好一个"、
+        // 找不到返回 None——这里 `unwrap()` 是在断言"资产必须符合上述节点命名契约"。
+        // 所以这里 `unwrap()` 是安全的，因为 GIMBAL 下有且只有一个 SHOT_DIRECTION 节点。
         let q = query.of(gimbal).flatten();
         // SHOT_DIRECTION：子弹从此节点的位置/朝向射出（PostUpdate 的 projectile_launch 会读它）。
         commands
             .entity(q.clone().exact("SHOT_DIRECTION").one().unwrap())
+            //插入InfantryLaunchOffset组件
             .insert(InfantryLaunchOffset);
         // CAM_DIRECTION：第一人称/自瞄视角所在节点——与 camera.rs 的 Robot 模式保持一致的契约。
         commands
+            //.entity表示获取CAM_DIRECTION节点的实体从q（HierarchyQuery）中提取出来
             .entity(q.exact("CAM_DIRECTION").one().unwrap())
             .insert(InfantryViewOffset);
     }

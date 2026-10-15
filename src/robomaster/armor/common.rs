@@ -37,7 +37,7 @@ pub enum ArmorLabel {
 }
 
 /// "小装甲"专用的编号集合：只可能出现这些编号的小装甲型号。
-/// 注意其变体排列顺序与 `ArmorLabel` 不同——这里的顺序是调试循环切换的展示顺序。
+/// 注意其变体排列顺序与 `ArmorLabel` 不同——调试循环切换的展示顺序由 `ArmorLabel::sequence_small()` 单独约定。
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum SmallArmorLabel {
     Sentry,
